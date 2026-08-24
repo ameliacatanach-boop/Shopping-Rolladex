@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shopping Rolladex (Live)</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  html, body, #root { height: 100%; margin: 0; padding: 0; }
+  body { -webkit-tap-highlight-color: transparent; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+// --- localStorage-backed shim matching the Claude artifact window.storage API ---
+window.storage = {
+  async get(key) {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return null;
+    return { key, value: raw, shared: false };
+  },
+  async set(key, value) {
+    localStorage.setItem(key, value);
+    return { key, value, shared: false };
+  },
+};
+
+// --- inline icons (replacing lucide-react) ---
+function Search(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>; }
+function StarIcon(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill={props.fill||"none"} stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>; }
+function ExternalLink(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>; }
+function X(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>; }
+function ChevronUp(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||18} height={props.size||18} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>; }
+function RefreshCw(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>; }
+
+const TIER_INFO = {
+  1: { label: 'Budget', hint: 'Under $80' },
+  2: { label: 'Accessible', hint: '$80–180' },
+  3: { label: 'Contemporary', hint: '$180–350' },
+  4: { label: 'Premium', hint: '$350–750' },
+  5: { label: 'Luxury', hint: '$750–1,400' },
+  6: { label: 'Designer', hint: '$1,400–5,000' },
+  7: { label: 'Ultra Luxury', hint: '$5,000+' },
+};
+
+const COLORS = {
+  paper: '#FFF8F2',
+  paperCard: '#FFFFFF',
+  ink: '#2B1B2E',
+  inkSoft: '#8A7A8C',
+  brass: '#FF6B35',
+  brassDark: '#E44E1B',
+  oxblood: '#FF3D81',
+  line: '#F3DFD3',
+};
+
+const ALL_TIERS = [1, 2, 3, 4, 5, 6, 7];
+const SHEET_URL_KEY = 'shop-sheet-url';
+
+function cleanLink(l) {
+  if (!l) return '';
+  l = l.trim();
+  if (!l) return '';
+  if (/^https?:\/\//i.test(l)) return l;
+  return 'https://' + l;
+}
+
+function parsePriceRange(pr) {
+  if (!pr) return { tier: null, tierLabel: '' };
+  const parts = pr.split(' - ');
+  const tier = parseInt(parts[0], 10);
+  const label = parts[1] ? parts[1].trim() : '';
+  return { tier: isNaN(tier) ? null : tier, tierLabel: label };
+}
+
+function parseShopsCSV(csvText) {
+  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+  const shops = [];
+  parsed.data.forEach((row, i) => {
+    const name = (row['Name'] || '').trim();
+    if (!name) return;
+    const { tier, tierLabel } = parsePriceRange((row['Price Range'] || '').trim());
+    const tagsRaw = (row['Tags'] || '').trim();
+    const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+    shops.push({
+      id: name + '__' + i,
+      name,
+      link: cleanLink(row['Site Link']),
+      category: (row['Category'] || '').trim() || 'Uncategorized',
+      basedIn: (row['Based In'] || '').trim() || 'Unknown',
+      tier,
+      tierLabel,
+      tags,
+    });
+  });
+  return shops;
+}
+
+function useLiveShops() {
+  const [sheetUrl, setSheetUrl] = useState(() => localStorage.getItem(SHEET_URL_KEY) || '');
+  const [shops, setShops] = useState([]);
+  const [status, setStatus] = useState('idle'); // idle | loading | success | error
+  const [errorMsg, setErrorMsg] = useState('');
+  const [lastSynced, setLastSynced] = useState(null);
+
+  const fetchShops = useCallback(async (url) => {
+    setStatus('loading');
+    setErrorMsg('');
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      const text = await res.text();
+      const parsedShops = parseShopsCSV(text);
+      setShops(parsedShops);
+      setLastSynced(new Date());
+      setStatus('success');
+    } catch (e) {
+      setErrorMsg(e.message || String(e));
+      setStatus('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (sheetUrl) fetchShops(sheetUrl);
+  }, [sheetUrl]);
+
+  const connect = (url) => {
+    const trimmed = url.trim();
+    localStorage.setItem(SHEET_URL_KEY, trimmed);
+    setSheetUrl(trimmed);
+  };
+
+  const disconnect = () => {
+    localStorage.removeItem(SHEET_URL_KEY);
+    setSheetUrl('');
+    setShops([]);
+    setStatus('idle');
+  };
+
+  const refresh = () => { if (sheetUrl) fetchShops(sheetUrl); };
+
+  return { sheetUrl, shops, status, errorMsg, lastSynced, connect, disconnect, refresh };
+}
+
+function useFavorites() {
+  const [favorites, setFavorites] = useState({});
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await window.storage.get('shop-favorites');
+        setFavorites(result && result.value ? JSON.parse(result.value) : {});
+      } catch (e) {
+        setFavorites({});
+      }
+      setLoaded(true);
+    })();
+  }, []);
+
+  const toggle = async (id) => {
+    setFavorites(prev => {
+      const next = { ...prev };
+      if (next[id]) delete next[id]; else next[id] = true;
+      window.storage.set('shop-favorites', JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
+
+  return { favorites, toggle, loaded };
+}
+
+function TierDots({ tier }) {
+  return (
+    <div className="flex items-center gap-[2px]" aria-label={`Price tier ${tier} of 7`}>
+      {ALL_TIERS.map(t => (
+        <span key={t} style={{ width: 5, height: 5, borderRadius: 9999, backgroundColor: t <= tier ? COLORS.brass : COLORS.line, display: 'inline-block' }} />
+      ))}
+    </div>
+  );
+}
+
+function Chip({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className="whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium border transition-colors"
+      style={{
+        backgroundColor: active ? COLORS.ink : COLORS.paperCard,
+        color: active ? COLORS.paperCard : COLORS.ink,
+        borderColor: active ? COLORS.ink : COLORS.line,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ShopCard({ shop, isFav, onToggleFav }) {
+  return (
+    <div className="relative rounded-md p-4 mb-3 shadow-sm" style={{ backgroundColor: COLORS.paperCard, border: `1px solid ${COLORS.line}`, borderLeft: `4px solid ${isFav ? COLORS.oxblood : COLORS.brass}` }}>
+      <div className="absolute -top-1 left-6 w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.paper, border: `1px solid ${COLORS.line}` }} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-lg truncate" style={{ color: COLORS.ink, fontFamily: "'Fraunces', serif", fontWeight: 600 }}>{shop.name}</h3>
+          <p className="text-xs mt-0.5" style={{ color: COLORS.inkSoft }}>{shop.basedIn} · {shop.category}</p>
+        </div>
+        <button onClick={() => onToggleFav(shop.id)} className="shrink-0 p-2 -m-2 rounded-full active:scale-95 transition-transform" aria-label={isFav ? 'Remove from favorites' : 'Add to favorites'}>
+          <StarIcon size={22} fill={isFav ? COLORS.oxblood : 'none'} color={isFav ? COLORS.oxblood : COLORS.inkSoft} />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 mt-3">
+        {shop.tier && (
+          <div className="flex items-center gap-1.5">
+            <TierDots tier={shop.tier} />
+            <span className="text-xs" style={{ color: COLORS.brassDark }}>{shop.tierLabel}</span>
+          </div>
+        )}
+      </div>
+
+      {shop.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {shop.tags.map(tag => (
+            <span key={tag} className="text-[11px] px-2 py-0.5 rounded" style={{ backgroundColor: COLORS.paper, color: COLORS.inkSoft }}>{tag}</span>
+          ))}
+        </div>
+      )}
+
+      {shop.link && (
+        <a href={shop.link} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium py-2 px-1 -m-1 active:opacity-70" style={{ color: COLORS.oxblood }}>
+          Visit site <ExternalLink size={14} />
+        </a>
+      )}
+    </div>
+  );
+}
+
+function ConnectScreen({ onConnect }) {
+  const [url, setUrl] = useState('');
+  return (
+    <div className="h-screen w-full flex items-center justify-center p-6" style={{ backgroundColor: COLORS.paper, fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap');`}</style>
+      <div className="max-w-sm w-full">
+        <h1 className="text-2xl mb-2" style={{ color: COLORS.ink, fontFamily: "'Fraunces', serif", fontWeight: 700 }}>Connect your sheet</h1>
+        <p className="text-sm mb-4" style={{ color: COLORS.inkSoft }}>
+          In Google Sheets: File → Share → Publish to web → choose CSV format → Publish. Paste that link below.
+        </p>
+        <input
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
+          className="w-full px-3 py-2.5 rounded-full text-sm outline-none"
+          style={{ backgroundColor: COLORS.paperCard, border: `1px solid ${COLORS.line}`, color: COLORS.ink }}
+        />
+        <button
+          onClick={() => url.trim() && onConnect(url)}
+          disabled={!url.trim()}
+          className="w-full mt-3 py-2.5 rounded-full text-sm font-semibold"
+          style={{ backgroundColor: COLORS.ink, color: COLORS.paperCard }}
+        >
+          Connect
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ShoppingRolladexLive() {
+  const { sheetUrl, shops, status, errorMsg, lastSynced, connect, disconnect, refresh } = useLiveShops();
+  const { favorites, toggle, loaded } = useFavorites();
+  const [search, setSearch] = useState('');
+  const [cats, setCats] = useState(new Set());
+  const [tiers, setTiers] = useState(new Set());
+  const [tags, setTags] = useState(new Set());
+  const [favOnly, setFavOnly] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [showJumpTop, setShowJumpTop] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const sectionRefs = useRef({});
+  const scrollRef = useRef(null);
+
+  const ALL_CATEGORIES = useMemo(() => [...new Set(shops.map(s => s.category))].sort(), [shops]);
+  const ALL_TAGS = useMemo(() => [...new Set(shops.flatMap(s => s.tags))].sort(), [shops]);
+  const ALL_LETTERS = useMemo(() => [...new Set(shops.map(s => s.name[0].toUpperCase()))].sort(), [shops]);
+
+  const toggleSetValue = (setFn, set, val) => {
+    setFn(prev => {
+      const next = new Set(prev);
+      if (next.has(val)) next.delete(val); else next.add(val);
+      return next;
+    });
+  };
+
+  const filtered = useMemo(() => {
+    return shops.filter(s => {
+      if (favOnly && !favorites[s.id]) return false;
+      if (cats.size && !cats.has(s.category)) return false;
+      if (tiers.size && !tiers.has(s.tier)) return false;
+      if (tags.size && !s.tags.some(t => tags.has(t))) return false;
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        if (!s.name.toLowerCase().includes(q) && !s.basedIn.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [shops, search, cats, tiers, tags, favOnly, favorites]);
+
+  const grouped = useMemo(() => {
+    const map = {};
+    filtered.forEach(s => {
+      const letter = s.name[0].toUpperCase();
+      if (!map[letter]) map[letter] = [];
+      map[letter].push(s);
+    });
+    return map;
+  }, [filtered]);
+
+  const activeLetters = Object.keys(grouped).sort();
+
+  const jumpTo = (letter) => {
+    const el = sectionRefs.current[letter];
+    if (el && scrollRef.current) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleScroll = (e) => setShowJumpTop(e.target.scrollTop > 400);
+  const activeFilterCount = cats.size + tiers.size + tags.size + (favOnly ? 1 : 0);
+  const clearAll = () => { setCats(new Set()); setTiers(new Set()); setTags(new Set()); setFavOnly(false); };
+
+  if (!sheetUrl) {
+    return <ConnectScreen onConnect={connect} />;
+  }
+
+  return (
+    <div className="h-screen w-full flex flex-col overflow-hidden" style={{ backgroundColor: COLORS.paper, fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap');`}</style>
+
+      <div className="px-4 pt-4 pb-3 shrink-0" style={{ borderBottom: `2px solid ${COLORS.brass}` }}>
+        <div className="flex items-baseline justify-between">
+          <h1 className="text-2xl tracking-tight" style={{ color: COLORS.ink, fontFamily: "'Fraunces', serif", fontWeight: 700 }}>Shopping Rolladex</h1>
+          <div className="flex items-center gap-2">
+            <span className="text-xs" style={{ color: COLORS.inkSoft }}>{filtered.length} / {shops.length}</span>
+            <button onClick={refresh} disabled={status === 'loading'} className="p-1.5 -m-1.5 rounded-full active:scale-95" aria-label="Refresh from sheet">
+              <RefreshCw size={15} color={COLORS.inkSoft} style={status === 'loading' ? { animation: 'spin 1s linear infinite' } : {}} />
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between mt-0.5">
+          <p className="text-[11px]" style={{ color: COLORS.inkSoft }}>
+            {status === 'loading' && 'Syncing…'}
+            {status === 'success' && lastSynced && `Synced ${lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+            {status === 'error' && <span style={{ color: COLORS.oxblood }}>Sync failed — showing last loaded data</span>}
+          </p>
+          <button onClick={() => setShowSettings(v => !v)} className="text-[11px] underline" style={{ color: COLORS.inkSoft }}>Sheet settings</button>
+        </div>
+
+        {showSettings && (
+          <div className="mt-2 p-3 rounded-lg text-xs" style={{ backgroundColor: COLORS.paperCard, border: `1px solid ${COLORS.line}` }}>
+            <p className="break-all mb-2" style={{ color: COLORS.inkSoft }}>{sheetUrl}</p>
+            <button onClick={disconnect} className="font-medium" style={{ color: COLORS.oxblood }}>Disconnect sheet</button>
+          </div>
+        )}
+
+        {status === 'error' && (
+          <div className="mt-2 p-2.5 rounded-lg text-xs" style={{ backgroundColor: '#FEE', color: COLORS.oxblood }}>{errorMsg}</div>
+        )}
+
+        <div className="mt-3 flex items-center gap-2 rounded-full px-3 py-2.5" style={{ backgroundColor: COLORS.paperCard, border: `1px solid ${COLORS.line}` }}>
+          <Search size={16} color={COLORS.inkSoft} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search brand or country…" className="flex-1 bg-transparent outline-none text-sm" style={{ color: COLORS.ink }} />
+          {search && (<button onClick={() => setSearch('')} aria-label="Clear search"><X size={16} color={COLORS.inkSoft} /></button>)}
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <button onClick={() => setFiltersOpen(v => !v)} className="text-sm font-medium px-3 py-2 rounded-full" style={{ backgroundColor: filtersOpen ? COLORS.ink : COLORS.paperCard, color: filtersOpen ? COLORS.paperCard : COLORS.ink, border: `1px solid ${COLORS.line}` }}>
+            Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
+          </button>
+          <Chip active={favOnly} onClick={() => setFavOnly(v => !v)}>★ Favorites</Chip>
+          {activeFilterCount > 0 && (<button onClick={clearAll} className="text-xs font-medium underline ml-1" style={{ color: COLORS.oxblood }}>Clear</button>)}
+        </div>
+
+        {filtersOpen && (
+          <div className="mt-3 space-y-2">
+            <div className="flex flex-wrap gap-1.5">{ALL_CATEGORIES.map(c => (<Chip key={c} active={cats.has(c)} onClick={() => toggleSetValue(setCats, cats, c)}>{c}</Chip>))}</div>
+            <div className="flex flex-wrap gap-1.5">{ALL_TIERS.map(t => (<Chip key={t} active={tiers.has(t)} onClick={() => toggleSetValue(setTiers, tiers, t)}>{t} · {TIER_INFO[t].label}</Chip>))}</div>
+            <div className="flex flex-wrap gap-1.5">{ALL_TAGS.map(tg => (<Chip key={tg} active={tags.has(tg)} onClick={() => toggleSetValue(setTags, tags, tg)}>{tg}</Chip>))}</div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 flex overflow-hidden relative">
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 pt-3 pb-6">
+          {status === 'loading' && shops.length === 0 && (
+            <div className="text-center mt-16" style={{ color: COLORS.inkSoft }}><p className="text-sm">Loading your shops…</p></div>
+          )}
+          {activeLetters.length === 0 && status !== 'loading' && (
+            <div className="text-center mt-16" style={{ color: COLORS.inkSoft }}>
+              <p className="text-sm">No shops match these filters.</p>
+              <button onClick={clearAll} className="mt-2 text-sm underline" style={{ color: COLORS.oxblood }}>Clear filters</button>
+            </div>
+          )}
+          {activeLetters.map(letter => (
+            <div key={letter} ref={el => (sectionRefs.current[letter] = el)}>
+              <div className="text-xs font-bold sticky top-0 py-1 mb-2 z-10" style={{ color: COLORS.brassDark, backgroundColor: COLORS.paper, fontFamily: "'Fraunces', serif" }}>{letter}</div>
+              {grouped[letter].map(shop => (<ShopCard key={shop.id} shop={shop} isFav={!!favorites[shop.id]} onToggleFav={toggle} />))}
+            </div>
+          ))}
+        </div>
+
+        <div className="w-6 flex flex-col items-center justify-center py-2 shrink-0" style={{ backgroundColor: COLORS.paper }}>
+          <div className="flex flex-col gap-[1px] max-h-full overflow-y-auto">
+            {ALL_LETTERS.map(letter => (
+              <button key={letter} onClick={() => jumpTo(letter)} disabled={!grouped[letter]} className="text-[9px] leading-none px-0.5 py-[1.5px] font-bold" style={{ color: grouped[letter] ? COLORS.brassDark : COLORS.line, fontFamily: "'Fraunces', serif" }}>{letter}</button>
+            ))}
+          </div>
+        </div>
+
+        {showJumpTop && (
+          <button onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} className="absolute bottom-4 right-9 rounded-full p-2.5 shadow-md" style={{ backgroundColor: COLORS.ink, color: COLORS.paperCard }} aria-label="Jump to top">
+            <ChevronUp size={18} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<ShoppingRolladexLive />);
+</script>
+</body>
+</html>
