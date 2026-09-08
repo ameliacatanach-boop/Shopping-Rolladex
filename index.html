@@ -39,6 +39,8 @@ function ExternalLink(props) { return <svg xmlns="http://www.w3.org/2000/svg" wi
 function X(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>; }
 function ChevronUp(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||18} height={props.size||18} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>; }
 function RefreshCw(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>; }
+function MapPin(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>; }
+function Store(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1.5-5.5A2 2 0 0 1 6.4 2h11.2a2 2 0 0 1 1.9 1.5L21 9"/><path d="M3 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><path d="M9 21V13h6v8"/></svg>; }
 
 const TIER_INFO = {
   1: { label: 'Budget', hint: 'Under $80' },
@@ -51,14 +53,16 @@ const TIER_INFO = {
 };
 
 const COLORS = {
-  paper: '#FFF8F2',
-  paperCard: '#FFFFFF',
-  ink: '#2B1B2E',
-  inkSoft: '#8A7A8C',
-  brass: '#FF6B35',
-  brassDark: '#E44E1B',
-  oxblood: '#FF3D81',
-  line: '#F3DFD3',
+  paper: '#FFFFFF',
+  paperCard: '#FAFAFA',
+  cardBg: '#FEF6F8',
+  ink: '#1A1A1A',
+  inkSoft: '#6B6B6B',
+  brass: '#C23F63',
+  brassDark: '#C23F63',
+  oxblood: '#C23F63',
+  line: '#E3E3E3',
+  tagBg: '#EAEAEA',
 };
 
 const ALL_TIERS = [1, 2, 3, 4, 5, 6, 7];
@@ -206,12 +210,15 @@ function Chip({ active, onClick, children }) {
 
 function ShopCard({ shop, isFav, onToggleFav }) {
   return (
-    <div className="relative rounded-md p-4 mb-3 shadow-sm" style={{ backgroundColor: COLORS.paperCard, border: `1px solid ${COLORS.line}`, borderLeft: `4px solid ${isFav ? COLORS.oxblood : COLORS.brass}` }}>
+    <div className="relative rounded-md p-4 mb-3 shadow-sm" style={{ backgroundColor: COLORS.cardBg, border: `2px solid ${isFav ? COLORS.oxblood : COLORS.ink}` }}>
       <div className="absolute -top-1 left-6 w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.paper, border: `1px solid ${COLORS.line}` }} />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-lg truncate" style={{ color: COLORS.ink, fontFamily: "'Fraunces', serif", fontWeight: 600 }}>{shop.name}</h3>
-          <p className="text-xs mt-0.5" style={{ color: COLORS.inkSoft }}>{shop.basedIn} · {shop.category}</p>
+          <h3 className="text-lg truncate" style={{ color: COLORS.ink, fontWeight: 600 }}>{shop.name.toUpperCase()}</h3>
+          <p className="flex items-center gap-3 mt-1 text-xs" style={{ color: COLORS.inkSoft }}>
+            <span className="flex items-center gap-1"><MapPin size={12} /> {shop.basedIn}</span>
+            <span className="flex items-center gap-1"><Store size={12} /> {shop.category}</span>
+          </p>
         </div>
         <button onClick={() => onToggleFav(shop.id)} className="shrink-0 p-2 -m-2 rounded-full active:scale-95 transition-transform" aria-label={isFav ? 'Remove from favorites' : 'Add to favorites'}>
           <StarIcon size={22} fill={isFav ? COLORS.oxblood : 'none'} color={isFav ? COLORS.oxblood : COLORS.inkSoft} />
@@ -230,7 +237,7 @@ function ShopCard({ shop, isFav, onToggleFav }) {
       {shop.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3">
           {shop.tags.map(tag => (
-            <span key={tag} className="text-[11px] px-2 py-0.5 rounded" style={{ backgroundColor: COLORS.paper, color: COLORS.inkSoft }}>{tag}</span>
+            <span key={tag} className="text-[12px] px-2.5 py-1 rounded-full" style={{ backgroundColor: COLORS.tagBg, color: COLORS.ink }}>{tag}</span>
           ))}
         </div>
       )}
@@ -248,9 +255,9 @@ function ConnectScreen({ onConnect }) {
   const [url, setUrl] = useState('');
   return (
     <div className="h-screen w-full flex items-center justify-center p-6" style={{ backgroundColor: COLORS.paper, fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap');`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');`}</style>
       <div className="max-w-sm w-full">
-        <h1 className="text-2xl mb-2" style={{ color: COLORS.ink, fontFamily: "'Fraunces', serif", fontWeight: 700 }}>Connect your sheet</h1>
+        <h1 className="text-2xl mb-2" style={{ color: COLORS.ink, fontWeight: 700 }}>Connect your sheet</h1>
         <p className="text-sm mb-4" style={{ color: COLORS.inkSoft }}>
           In Google Sheets: File → Share → Publish to web → choose CSV format → Publish. Paste that link below.
         </p>
@@ -342,11 +349,11 @@ function ShoppingRolladexLive() {
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden" style={{ backgroundColor: COLORS.paper, fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap');`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');`}</style>
 
       <div className="px-4 pt-4 pb-3 shrink-0" style={{ borderBottom: `2px solid ${COLORS.brass}` }}>
         <div className="flex items-baseline justify-between">
-          <h1 className="text-2xl tracking-tight" style={{ color: COLORS.ink, fontFamily: "'Fraunces', serif", fontWeight: 700 }}>Shopping Rolladex</h1>
+          <h1 className="text-2xl tracking-tight" style={{ color: COLORS.ink, fontWeight: 700 }}>Shopping Rolladex</h1>
           <div className="flex items-center gap-2">
             <span className="text-xs" style={{ color: COLORS.inkSoft }}>{filtered.length} / {shops.length}</span>
             <button onClick={refresh} disabled={status === 'loading'} className="p-1.5 -m-1.5 rounded-full active:scale-95" aria-label="Refresh from sheet">
@@ -419,7 +426,7 @@ function ShoppingRolladexLive() {
           )}
           {activeLetters.map(letter => (
             <div key={letter} ref={el => (sectionRefs.current[letter] = el)}>
-              <div className="text-xs font-bold sticky top-0 py-1 mb-2 z-10" style={{ color: COLORS.brassDark, backgroundColor: COLORS.paper, fontFamily: "'Fraunces', serif" }}>{letter}</div>
+              <div className="text-xs font-bold sticky top-0 py-1 mb-2 z-10" style={{ color: COLORS.brassDark, backgroundColor: COLORS.paper }}>{letter}</div>
               {grouped[letter].map(shop => (<ShopCard key={shop.id} shop={shop} isFav={!!favorites[shop.id]} onToggleFav={toggle} />))}
             </div>
           ))}
@@ -428,7 +435,7 @@ function ShoppingRolladexLive() {
         <div className="w-6 flex flex-col items-center justify-center py-2 shrink-0" style={{ backgroundColor: COLORS.paper }}>
           <div className="flex flex-col gap-[1px] max-h-full overflow-y-auto">
             {ALL_LETTERS.map(letter => (
-              <button key={letter} onClick={() => jumpTo(letter)} disabled={!grouped[letter]} className="text-[9px] leading-none px-0.5 py-[1.5px] font-bold" style={{ color: grouped[letter] ? COLORS.brassDark : COLORS.line, fontFamily: "'Fraunces', serif" }}>{letter}</button>
+              <button key={letter} onClick={() => jumpTo(letter)} disabled={!grouped[letter]} className="text-[9px] leading-none px-0.5 py-[1.5px] font-bold" style={{ color: grouped[letter] ? COLORS.brassDark : COLORS.line }}>{letter}</button>
             ))}
           </div>
         </div>
