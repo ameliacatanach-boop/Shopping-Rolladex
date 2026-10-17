@@ -1,457 +1,704 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Shopping Rolladex (Live)</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rolladex">
+<title>Shopping Rolladex</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;0,6..96,800;1,6..96,400&family=Instrument+Sans:wght@400;500;600&display=swap">
 <style>
-  html, body, #root { height: 100%; margin: 0; padding: 0; }
-  body { -webkit-tap-highlight-color: transparent; }
+:root{
+  --ink:#111111; --paper:#FFFFFF; --muted:#5E5E5E; --hairline:#D4D4D4; --pill:#EDEDED;
+  --lilac:#E3DAF1; --lilac-deep:#6A55A0; --lilac-ink:#4F3E80; --press:#F4F4F4;
+  --serif:'Bodoni Moda', Didot, 'Times New Roman', serif;
+  --sans:'Instrument Sans', -apple-system, 'Helvetica Neue', sans-serif;
+  --safe-b:env(safe-area-inset-bottom, 0px); --safe-t:env(safe-area-inset-top, 0px);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-text-size-adjust:100%}
+body{min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--ink)}
+:focus-visible{outline:2px solid var(--lilac-deep);outline-offset:2px}
+.wrap{max-width:600px;margin:0 auto;padding:calc(20px + var(--safe-t)) 20px calc(110px + var(--safe-b))}
+.label{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.muted{color:var(--muted)}
+.hl{background:linear-gradient(transparent 32%, var(--lilac) 32%, var(--lilac) 86%, transparent 86%);padding:0 4px;margin-left:-4px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.star{color:var(--lilac-deep)}
+.topline{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--ink);min-height:44px}
+.textbtn{background:none;border:none;padding:0 2px;min-height:44px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.masthead{font-family:var(--serif);font-size:58px;font-weight:800;line-height:.95;letter-spacing:-.01em;padding:14px 0 12px;border-bottom:3px solid var(--ink);margin:0}
+.search{display:flex;align-items:center;gap:10px;min-height:52px;border-bottom:1px solid var(--ink)}
+.search input{border:none;outline:none;background:transparent;font-size:16px;flex:1;min-width:0;height:48px}
+.search input::placeholder{color:var(--muted)}
+.chips{display:flex;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--ink);flex-wrap:wrap}
+.chip{height:36px;padding:0 12px;border:1px solid var(--ink);border-radius:0;background:var(--ink);color:var(--paper);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;position:relative}
+.chip::after{content:"";position:absolute;inset:-4px 0}
+.chip.outline{background:var(--paper);color:var(--ink)}
+.chip.trip{background:var(--lilac);color:var(--ink);border-color:var(--lilac-deep)}
+.metaline{display:flex;justify-content:space-between;align-items:center;min-height:44px;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid var(--hairline)}
+.sortsel{border:none;background:transparent;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;min-height:44px;text-align:right;-webkit-appearance:none;appearance:none;padding-right:16px;background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);background-position:calc(100% - 7px) 55%,calc(100% - 2px) 55%;background-size:5px 5px;background-repeat:no-repeat}
+.notice{font-family:var(--serif);font-style:italic;font-size:15px;line-height:1.4;padding:12px 0;border-bottom:1px solid var(--hairline)}
+.notice b{font-style:normal;font-family:var(--sans);font-size:13px}
+.row{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--hairline);text-decoration:none;color:var(--ink);min-height:64px;width:100%;background:none;border-left:none;border-right:none;border-top:none;text-align:left}
+.row:active{background:var(--press)}
+.row .num{font-size:12px;font-weight:600;width:28px;flex:none;padding-top:7px;font-variant-numeric:tabular-nums}
+.row .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.row .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.row .name{font-family:var(--serif);font-size:24px;font-weight:600;line-height:1.2;text-transform:uppercase;overflow-wrap:anywhere}
+.row .tier{font-size:12px;font-weight:600;letter-spacing:.06em;white-space:nowrap;flex:none}
+.row.dim .name{color:var(--muted)}
+.row.gone .name{text-decoration:line-through}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{font-size:11px;background:var(--pill);padding:3px 8px;border-radius:999px;color:var(--ink)}
+.pill.lg{font-size:12px;padding:6px 12px}
+.empty{padding:40px 0;text-align:center}
+.empty p{font-family:var(--serif);font-style:italic;font-size:20px;margin:0 0 16px}
+.skel{height:18px;background:var(--pill);margin:22px 0 22px 42px;width:60%}
+.bottom{position:fixed;left:0;right:0;bottom:0;padding:0 20px calc(20px + var(--safe-b));pointer-events:none;z-index:5}
+.bottom > *{pointer-events:auto;max-width:560px;margin:0 auto}
+.bottom:not(:empty){background:var(--paper);padding-top:12px;border-top:1px solid var(--ink)}
+.bar{background:var(--ink);color:var(--paper);font-size:12px;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.bar button{background:none;border:1px solid var(--paper);color:var(--paper);font-size:11px;font-weight:600;letter-spacing:.1em;min-height:32px;padding:0 10px}
+.primary{display:flex;align-items:center;justify-content:center;width:100%;height:56px;background:var(--ink);color:var(--paper);border:1px solid var(--ink);border-radius:0;text-decoration:none;font-size:13px;font-weight:600;letter-spacing:.16em;text-transform:uppercase}
+.secondary{display:flex;align-items:center;justify-content:center;height:56px;background:var(--paper);color:var(--ink);border:1px solid var(--ink);border-radius:0;font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;text-decoration:none;padding:0 16px}
+.secondary[aria-disabled="true"],.primary[aria-disabled="true"]{color:var(--muted);border-color:var(--hairline);background:var(--paper)}
+.layer{position:fixed;inset:0;background:var(--paper);overflow-y:auto;z-index:10;-webkit-overflow-scrolling:touch}
+.layer[hidden]{display:none}
+.pagetitle{display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:3px solid var(--ink)}
+.pagetitle h1{font-family:var(--serif);font-size:40px;font-weight:800;margin:0;line-height:1}
+.sect{padding:16px 0;border-bottom:1px solid var(--ink)}
+.sect:last-child{border-bottom:none}
+.sect .head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+.val{font-family:var(--serif);font-size:20px;font-weight:600}
+.tiers{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--ink)}
+.tiers button{height:44px;border:none;border-right:1px solid var(--ink);background:var(--paper);font-family:var(--serif);font-size:18px;padding:0}
+.tiers button:last-child{border-right:none}
+.tiers button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-right-color:var(--paper)}
+.tiers button[aria-pressed="true"]:last-child,.tiers button[aria-pressed="true"]+button[aria-pressed="false"]{}
+.caption{font-size:12px;color:var(--muted);margin-top:10px}
+.offerbtn{height:36px;padding:0 12px;border:none;border-radius:999px;background:var(--pill);font-size:13px;position:relative}
+.offerbtn::after{content:"";position:absolute;inset:-4px 0}
+.offerbtn[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.offerbtn .n{opacity:.6;margin-left:4px;font-size:11px}
+.check{display:flex;justify-content:space-between;align-items:center;min-height:44px;font-size:15px;gap:12px}
+.check input{width:20px;height:20px;accent-color:var(--lilac-deep);flex:none}
+.check .n{color:var(--muted);font-size:12px;margin-left:6px}
+.navrow{display:flex;justify-content:space-between;align-items:center;width:100%;min-height:64px;background:none;border:none;padding:16px 0;border-bottom:1px solid var(--ink);text-align:left}
+.navrow .val{font-weight:400}
+.detailname{font-family:var(--serif);font-size:56px;font-weight:800;line-height:.98;margin:0;text-transform:uppercase;overflow-wrap:anywhere}
+.standfirst{font-family:var(--serif);font-style:italic;font-size:17px;color:#333}
+.logo{width:56px;height:56px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--pill);font-family:var(--serif);font-weight:800;font-size:20px;overflow:hidden}
+.logo img{width:40px;height:40px;object-fit:contain}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:3px solid var(--ink);border-bottom:1px solid var(--ink)}
+.stats > div{padding:12px 10px;display:flex;flex-direction:column;gap:6px;border-left:1px solid var(--ink);min-width:0}
+.stats > div:first-child{border-left:none;background:var(--lilac)}
+.stats .big{font-family:var(--serif);font-size:30px;font-weight:800;line-height:1;overflow-wrap:anywhere}
+.stats .small{font-size:11px;color:var(--muted)}
+.stats > div:first-child .small{color:var(--ink)}
+.kv{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:12px 0;border-bottom:1px solid var(--ink)}
+.kv .v{font-family:var(--serif);font-size:18px;text-align:right;overflow-wrap:anywhere}
+.badge{display:inline-flex;align-items:center;height:32px;padding:0 10px;border:1px solid var(--lilac-deep);color:var(--lilac-deep);font-size:11px;font-weight:600;letter-spacing:.12em}
+.signin{min-height:100vh;display:flex;flex-direction:column;justify-content:center;gap:24px}
+.signin p{font-family:var(--serif);font-style:italic;font-size:20px;margin:0}
+.err{background:var(--lilac);padding:12px 14px;font-size:14px;line-height:1.4}
+@media (prefers-reduced-motion:no-preference){.layer{animation:up .2s ease-out}@keyframes up{from{transform:translateY(16px);opacity:.6}to{transform:none;opacity:1}}}
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel" data-presets="react">
-const { useState, useEffect, useRef, useMemo, useCallback } = React;
+<div id="browse" class="wrap" aria-live="polite"></div>
+<div id="layer" class="layer" hidden></div>
+<div id="bottom" class="bottom"></div>
 
-// --- localStorage-backed shim matching the Claude artifact window.storage API ---
-window.storage = {
-  async get(key) {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return null;
-    return { key, value: raw, shared: false };
-  },
-  async set(key, value) {
-    localStorage.setItem(key, value);
-    return { key, value, shared: false };
-  },
-};
+<script>
+/* CORE START — pure logic, no DOM. Tested against the real Sheet. */
+var Core = (function(){
+  var OFFERS = ['Clothing','Tops','Knitwear','Dresses','Pants & skirts','Denim','Outerwear','Swim','Lingerie','Sleep & lounge','Activewear','Shoes','Bags','Accessories','Jewellery','Fine jewellery','Homewares'];
+  var TYPES = ['Own label','Multi-brand boutique','Vintage & resale'];
+  var STATUSES = ['Want to try','Bought from','Not for me'];
+  var REGION = {
+    'Australia':'Australia','New Zealand':'New Zealand','UK':'UK',
+    'France':'Europe','Spain':'Europe','Denmark':'Europe','Italy':'Europe','Sweden':'Europe','Netherlands':'Europe','Germany':'Europe','Portugal':'Europe','Belgium':'Europe','Poland':'Europe','Ukraine':'Europe',
+    'USA':'North America','Canada':'North America','Mexico':'North America',
+    'Argentina':'Latin America','Colombia':'Latin America',
+    'India':'Asia','Japan':'Asia','South Korea':'Asia','Vietnam':'Asia','Malaysia':'Asia',
+    'Turkey':'Middle East & Africa','Egypt':'Middle East & Africa','Lebanon':'Middle East & Africa','South Africa':'Middle East & Africa'
+  };
+  var REGIONS = ['Australia','New Zealand','UK','Europe','North America','Latin America','Asia','Middle East & Africa','Rest of world'];
+  function regionOf(country){ return REGION[country] || (country ? 'Rest of world' : ''); }
 
-// --- inline icons (replacing lucide-react) ---
-function Search(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>; }
-function StarIcon(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill={props.fill||"none"} stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>; }
-function ExternalLink(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>; }
-function X(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>; }
-function ChevronUp(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||18} height={props.size||18} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>; }
-function RefreshCw(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>; }
-function MapPin(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>; }
-function Store(props) { return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||16} height={props.size||16} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1.5-5.5A2 2 0 0 1 6.4 2h11.2a2 2 0 0 1 1.9 1.5L21 9"/><path d="M3 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><path d="M9 21V13h6v8"/></svg>; }
+  function fold(s){ return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+  function norm(s){ return fold(s).replace(/[^a-z0-9]/g,''); }
+  function list(s){ return String(s == null ? '' : s).split(',').map(function(x){return x.trim();}).filter(Boolean); }
 
-const TIER_INFO = {
-  1: { label: 'Budget', hint: 'Under $80' },
-  2: { label: 'Accessible', hint: '$80–180' },
-  3: { label: 'Contemporary', hint: '$180–350' },
-  4: { label: 'Premium', hint: '$350–750' },
-  5: { label: 'Luxury', hint: '$750–1,400' },
-  6: { label: 'Designer', hint: '$1,400–5,000' },
-  7: { label: 'Ultra Luxury', hint: '$5,000+' },
-};
-
-const COLORS = {
-  paper: '#FFFFFF',
-  paperCard: '#FAFAFA',
-  cardBg: '#FEF6F8',
-  ink: '#1A1A1A',
-  inkSoft: '#6B6B6B',
-  brass: '#C23F63',
-  brassDark: '#C23F63',
-  oxblood: '#C23F63',
-  line: '#E3E3E3',
-  tagBg: '#EAEAEA',
-};
-
-const ALL_TIERS = [1, 2, 3, 4, 5, 6, 7];
-const SHEET_URL_KEY = 'shop-sheet-url';
-const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRYa3WJFhvL-V2c38QhRzyUOYVLfYNr5OqM_DeLNjdZzMnjJ1L8gZFsD1fC6cDn-cHTyYXRR8cou9l/pub?gid=0&single=true&output=csv';
-
-function cleanLink(l) {
-  if (!l) return '';
-  l = l.trim();
-  if (!l) return '';
-  if (/^https?:\/\//i.test(l)) return l;
-  return 'https://' + l;
-}
-
-function parsePriceRange(pr) {
-  if (!pr) return { tier: null, tierLabel: '' };
-  const parts = pr.split(' - ');
-  const tier = parseInt(parts[0], 10);
-  const label = parts[1] ? parts[1].trim() : '';
-  return { tier: isNaN(tier) ? null : tier, tierLabel: label };
-}
-
-function parseShopsCSV(csvText) {
-  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-  const shops = [];
-  parsed.data.forEach((row, i) => {
-    const name = (row['Name'] || '').trim();
-    if (!name) return;
-    const { tier, tierLabel } = parsePriceRange((row['Price Range'] || '').trim());
-    const tagsRaw = (row['Tags'] || '').trim();
-    const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
-    shops.push({
-      id: name + '__' + i,
-      name,
-      link: cleanLink(row['Site Link']),
-      category: (row['Category'] || '').trim() || 'Uncategorized',
-      basedIn: (row['Based In'] || '').trim() || 'Unknown',
-      tier,
-      tierLabel,
-      tags,
-    });
-  });
-  return shops;
-}
-
-function useLiveShops() {
-  const [sheetUrl, setSheetUrl] = useState(() => localStorage.getItem(SHEET_URL_KEY) || DEFAULT_SHEET_URL);
-  const [shops, setShops] = useState([]);
-  const [status, setStatus] = useState('idle'); // idle | loading | success | error
-  const [errorMsg, setErrorMsg] = useState('');
-  const [lastSynced, setLastSynced] = useState(null);
-
-  const fetchShops = useCallback(async (url) => {
-    setStatus('loading');
-    setErrorMsg('');
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      const text = await res.text();
-      const parsedShops = parseShopsCSV(text);
-      setShops(parsedShops);
-      setLastSynced(new Date());
-      setStatus('success');
-    } catch (e) {
-      setErrorMsg(e.message || String(e));
-      setStatus('error');
+  function parseShops(values){
+    if (!values || !values.length) return [];
+    var head = values[0].map(function(h){ return norm(h); });
+    function col(name){ return head.indexOf(norm(name)); }
+    var C = {id:col('ID'),fav:col('Favourite'),name:col('Name'),link:col('Link'),type:col('Shop type'),based:col('Based in'),tier:col('Price tier'),priceNote:col('Price note'),offers:col('Offers'),ships:col('Ships to AU'),shipNote:col('Shipping note'),currency:col('Currency'),cities:col('Store cities'),storeDetails:col('Store details'),status:col('Status'),avail:col('Availability'),notes:col('Notes'),added:col('Date added'),visited:col('Last visited')};
+    if (C.name < 0) throw new Error('The Shops tab has no "Name" column.');
+    var out = [];
+    for (var i = 1; i < values.length; i++){
+      var r = values[i] || [];
+      var g = function(k){ var j = C[k]; return j < 0 ? '' : String(r[j] == null ? '' : r[j]).trim(); };
+      var name = g('name'); if (!name) continue;
+      var tierTxt = g('tier'); var tm = tierTxt.match(/^(\d)/);
+      out.push({
+        row: i + 1, id: g('id') || ('row' + (i + 1)), fav: g('fav') !== '', name: name, link: g('link'),
+        type: g('type'), based: g('based'), region: regionOf(g('based')),
+        tier: tm ? Number(tm[1]) : null, tierLabel: tierTxt.replace(/^\d\s*-\s*/,''),
+        priceNote: g('priceNote'), offers: list(g('offers')), ships: g('ships'), shipNote: g('shipNote'), currency: g('currency'),
+        cities: list(g('cities')), storeDetails: g('storeDetails'), status: g('status'), avail: g('avail') || 'Available',
+        notes: g('notes'), added: g('added'), visited: g('visited'), key: norm(name)
+      });
     }
-  }, []);
-
-  useEffect(() => {
-    if (sheetUrl) fetchShops(sheetUrl);
-  }, [sheetUrl]);
-
-  const connect = (url) => {
-    const trimmed = url.trim();
-    localStorage.setItem(SHEET_URL_KEY, trimmed);
-    setSheetUrl(trimmed);
-  };
-
-  const disconnect = () => {
-    localStorage.removeItem(SHEET_URL_KEY);
-    setSheetUrl('');
-    setShops([]);
-    setStatus('idle');
-  };
-
-  const refresh = () => { if (sheetUrl) fetchShops(sheetUrl); };
-
-  return { sheetUrl, shops, status, errorMsg, lastSynced, connect, disconnect, refresh };
-}
-
-function useFavorites() {
-  const [favorites, setFavorites] = useState({});
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const result = await window.storage.get('shop-favorites');
-        setFavorites(result && result.value ? JSON.parse(result.value) : {});
-      } catch (e) {
-        setFavorites({});
-      }
-      setLoaded(true);
-    })();
-  }, []);
-
-  const toggle = async (id) => {
-    setFavorites(prev => {
-      const next = { ...prev };
-      if (next[id]) delete next[id]; else next[id] = true;
-      window.storage.set('shop-favorites', JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-  };
-
-  return { favorites, toggle, loaded };
-}
-
-function TierDots({ tier }) {
-  return (
-    <div className="flex items-center gap-[2px]" aria-label={`Price tier ${tier} of 7`}>
-      {ALL_TIERS.map(t => (
-        <span key={t} style={{ width: 5, height: 5, borderRadius: 9999, backgroundColor: t <= tier ? COLORS.brass : COLORS.line, display: 'inline-block' }} />
-      ))}
-    </div>
-  );
-}
-
-function Chip({ active, onClick, children }) {
-  return (
-    <button
-      onClick={onClick}
-      className="whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium border transition-colors"
-      style={{
-        backgroundColor: active ? COLORS.ink : COLORS.paperCard,
-        color: active ? COLORS.paperCard : COLORS.ink,
-        borderColor: active ? COLORS.ink : COLORS.line,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ShopCard({ shop, isFav, onToggleFav }) {
-  return (
-    <div className="relative rounded-md p-4 mb-3 shadow-sm" style={{ backgroundColor: COLORS.cardBg, border: `2px solid ${isFav ? COLORS.oxblood : COLORS.ink}` }}>
-      <div className="absolute -top-1 left-6 w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.paper, border: `1px solid ${COLORS.line}` }} />
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-lg truncate" style={{ color: COLORS.ink, fontWeight: 600 }}>{shop.name.toUpperCase()}</h3>
-          <p className="flex items-center gap-3 mt-1 text-xs" style={{ color: COLORS.inkSoft }}>
-            <span className="flex items-center gap-1"><MapPin size={12} /> {shop.basedIn}</span>
-            <span className="flex items-center gap-1"><Store size={12} /> {shop.category}</span>
-          </p>
-        </div>
-        <button onClick={() => onToggleFav(shop.id)} className="shrink-0 p-2 -m-2 rounded-full active:scale-95 transition-transform" aria-label={isFav ? 'Remove from favorites' : 'Add to favorites'}>
-          <StarIcon size={22} fill={isFav ? COLORS.oxblood : 'none'} color={isFav ? COLORS.oxblood : COLORS.inkSoft} />
-        </button>
-      </div>
-
-      <div className="flex items-center gap-2 mt-3">
-        {shop.tier && (
-          <div className="flex items-center gap-1.5">
-            <TierDots tier={shop.tier} />
-            <span className="text-xs" style={{ color: COLORS.brassDark }}>{shop.tierLabel}</span>
-          </div>
-        )}
-      </div>
-
-      {shop.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-3">
-          {shop.tags.map(tag => (
-            <span key={tag} className="text-[12px] px-2.5 py-1 rounded-full" style={{ backgroundColor: COLORS.tagBg, color: COLORS.ink }}>{tag}</span>
-          ))}
-        </div>
-      )}
-
-      {shop.link && (
-        <a href={shop.link} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium py-2 px-1 -m-1 active:opacity-70" style={{ color: COLORS.oxblood }}>
-          Visit site <ExternalLink size={14} />
-        </a>
-      )}
-    </div>
-  );
-}
-
-function ConnectScreen({ onConnect }) {
-  const [url, setUrl] = useState('');
-  return (
-    <div className="h-screen w-full flex items-center justify-center p-6" style={{ backgroundColor: COLORS.paper, fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');`}</style>
-      <div className="max-w-sm w-full">
-        <h1 className="text-2xl mb-2" style={{ color: COLORS.ink, fontWeight: 700 }}>Connect your sheet</h1>
-        <p className="text-sm mb-4" style={{ color: COLORS.inkSoft }}>
-          In Google Sheets: File → Share → Publish to web → choose CSV format → Publish. Paste that link below.
-        </p>
-        <input
-          value={url}
-          onChange={e => setUrl(e.target.value)}
-          placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
-          className="w-full px-3 py-2.5 rounded-full text-sm outline-none"
-          style={{ backgroundColor: COLORS.paperCard, border: `1px solid ${COLORS.line}`, color: COLORS.ink }}
-        />
-        <button
-          onClick={() => url.trim() && onConnect(url)}
-          disabled={!url.trim()}
-          className="w-full mt-3 py-2.5 rounded-full text-sm font-semibold"
-          style={{ backgroundColor: COLORS.ink, color: COLORS.paperCard }}
-        >
-          Connect
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ShoppingRolladexLive() {
-  const { sheetUrl, shops, status, errorMsg, lastSynced, connect, disconnect, refresh } = useLiveShops();
-  const { favorites, toggle, loaded } = useFavorites();
-  const [search, setSearch] = useState('');
-  const [cats, setCats] = useState(new Set());
-  const [tiers, setTiers] = useState(new Set());
-  const [tags, setTags] = useState(new Set());
-  const [favOnly, setFavOnly] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [showJumpTop, setShowJumpTop] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-
-  const sectionRefs = useRef({});
-  const scrollRef = useRef(null);
-
-  const ALL_CATEGORIES = useMemo(() => [...new Set(shops.map(s => s.category))].sort(), [shops]);
-  const ALL_TAGS = useMemo(() => [...new Set(shops.flatMap(s => s.tags))].sort(), [shops]);
-  const ALL_LETTERS = useMemo(() => [...new Set(shops.map(s => s.name[0].toUpperCase()))].sort(), [shops]);
-
-  const toggleSetValue = (setFn, set, val) => {
-    setFn(prev => {
-      const next = new Set(prev);
-      if (next.has(val)) next.delete(val); else next.add(val);
-      return next;
-    });
-  };
-
-  const filtered = useMemo(() => {
-    return shops.filter(s => {
-      if (favOnly && !favorites[s.id]) return false;
-      if (cats.size && !cats.has(s.category)) return false;
-      if (tiers.size && !tiers.has(s.tier)) return false;
-      if (tags.size && !s.tags.some(t => tags.has(t))) return false;
-      if (search.trim()) {
-        const q = search.trim().toLowerCase();
-        if (!s.name.toLowerCase().includes(q) && !s.basedIn.toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }, [shops, search, cats, tiers, tags, favOnly, favorites]);
-
-  const grouped = useMemo(() => {
-    const map = {};
-    filtered.forEach(s => {
-      const letter = s.name[0].toUpperCase();
-      if (!map[letter]) map[letter] = [];
-      map[letter].push(s);
-    });
-    return map;
-  }, [filtered]);
-
-  const activeLetters = Object.keys(grouped).sort();
-
-  const jumpTo = (letter) => {
-    const el = sectionRefs.current[letter];
-    if (el && scrollRef.current) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  const handleScroll = (e) => setShowJumpTop(e.target.scrollTop > 400);
-  const activeFilterCount = cats.size + tiers.size + tags.size + (favOnly ? 1 : 0);
-  const clearAll = () => { setCats(new Set()); setTiers(new Set()); setTags(new Set()); setFavOnly(false); };
-
-  if (!sheetUrl) {
-    return <ConnectScreen onConnect={connect} />;
+    return out;
+  }
+  function parseGuide(values){
+    var g = {};
+    (values || []).slice(1).forEach(function(r){ var t = parseInt(r[0], 10); if (t) g[t] = {label: r[1] || '', price: r[2] || '', desc: r[3] || ''}; });
+    return g;
   }
 
-  return (
-    <div className="h-screen w-full flex flex-col overflow-hidden" style={{ backgroundColor: COLORS.paper, fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');`}</style>
+  // Approximate substring match: smallest edit distance between p and any substring of t.
+  function approx(p, t){
+    var prev = new Array(t.length + 1).fill(0), cur = new Array(t.length + 1);
+    for (var i = 1; i <= p.length; i++){
+      cur[0] = i;
+      for (var j = 1; j <= t.length; j++){
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (p[i - 1] === t[j - 1] ? 0 : 1));
+      }
+      var tmp = prev; prev = cur; cur = tmp;
+    }
+    return Math.min.apply(null, prev);
+  }
+  function domainOf(link){ try { return new URL(/^https?:/i.test(link) ? link : 'https://' + link).hostname.replace(/^www\./,''); } catch(e){ return ''; } }
+  function nameMatches(shop, text){
+    var q = norm(text); if (!q) return true;
+    if (shop.key.indexOf(q) >= 0) return true;
+    var d = norm(domainOf(shop.link)); if (q.length >= 3 && d.indexOf(q) >= 0) return true;
+    if (q.length < 4) return false;
+    var allowed = q.length >= 8 ? 2 : 1;
+    return approx(q, shop.key) <= allowed;
+  }
 
-      <div className="px-4 pt-4 pb-3 shrink-0" style={{ borderBottom: `2px solid ${COLORS.brass}` }}>
-        <div className="flex items-baseline justify-between">
-          <h1 className="text-2xl tracking-tight" style={{ color: COLORS.ink, fontWeight: 700 }}>Shopping Rolladex</h1>
-          <div className="flex items-center gap-2">
-            <span className="text-xs" style={{ color: COLORS.inkSoft }}>{filtered.length} / {shops.length}</span>
-            <button onClick={refresh} disabled={status === 'loading'} className="p-1.5 -m-1.5 rounded-full active:scale-95" aria-label="Refresh from sheet">
-              <RefreshCw size={15} color={COLORS.inkSoft} style={status === 'loading' ? { animation: 'spin 1s linear infinite' } : {}} />
-            </button>
-          </div>
-        </div>
-        <div className="flex items-center justify-between mt-0.5">
-          <p className="text-[11px]" style={{ color: COLORS.inkSoft }}>
-            {status === 'loading' && 'Syncing…'}
-            {status === 'success' && lastSynced && `Synced ${lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
-            {status === 'error' && <span style={{ color: COLORS.oxblood }}>Sync failed — showing last loaded data</span>}
-          </p>
-          <button onClick={() => setShowSettings(v => !v)} className="text-[11px] underline" style={{ color: COLORS.inkSoft }}>Sheet settings</button>
-        </div>
+  // ---- Smart search ----
+  var OFFER_WORDS = [
+    ['fine jewellery','Fine jewellery'],['fine jewelry','Fine jewellery'],
+    ['jewellery','Jewellery'],['jewelry','Jewellery'],['jewels','Jewellery'],['earrings','Jewellery'],['necklaces','Jewellery'],
+    ['knitwear','Knitwear'],['knits','Knitwear'],['knit','Knitwear'],['jumpers','Knitwear'],['jumper','Knitwear'],['sweaters','Knitwear'],['sweater','Knitwear'],['cardigans','Knitwear'],['cardigan','Knitwear'],
+    ['dresses','Dresses'],['dress','Dresses'],
+    ['tops','Tops'],['top','Tops'],['shirts','Tops'],['shirt','Tops'],['tees','Tops'],['blouses','Tops'],
+    ['pants','Pants & skirts'],['trousers','Pants & skirts'],['skirts','Pants & skirts'],['skirt','Pants & skirts'],['shorts','Pants & skirts'],
+    ['denim','Denim'],['jeans','Denim'],
+    ['outerwear','Outerwear'],['coats','Outerwear'],['coat','Outerwear'],['jackets','Outerwear'],['jacket','Outerwear'],['blazers','Outerwear'],
+    ['swimwear','Swim'],['swimsuits','Swim'],['bikinis','Swim'],['swim','Swim'],
+    ['lingerie','Lingerie'],['underwear','Lingerie'],['intimates','Lingerie'],['bras','Lingerie'],
+    ['sleepwear','Sleep & lounge'],['loungewear','Sleep & lounge'],['pyjamas','Sleep & lounge'],['pajamas','Sleep & lounge'],
+    ['activewear','Activewear'],['sportswear','Activewear'],
+    ['footwear','Shoes'],['shoes','Shoes'],['boots','Shoes'],['sandals','Shoes'],['sneakers','Shoes'],['heels','Shoes'],
+    ['handbags','Bags'],['bags','Bags'],['bag','Bags'],['totes','Bags'],
+    ['accessories','Accessories'],['scarves','Accessories'],['hats','Accessories'],['belts','Accessories'],['sunglasses','Accessories'],
+    ['homewares','Homewares'],['homeware','Homewares'],
+    ['clothing','Clothing'],['clothes','Clothing']
+  ];
+  var PLACE_WORDS = [
+    ['north american','region:North America'],['latin american','region:Latin America'],['middle eastern','region:Middle East & Africa'],
+    ['european','region:Europe'],['europe','region:Europe'],['asian','region:Asia'],['asia','region:Asia'],
+    ['new zealand','country:New Zealand'],['kiwi','country:New Zealand'],['nz','country:New Zealand'],
+    ['south african','country:South Africa'],['south africa','country:South Africa'],['south korean','country:South Korea'],['south korea','country:South Korea'],['korean','country:South Korea'],['korea','country:South Korea'],
+    ['australian','country:Australia'],['australia','country:Australia'],['aussie','country:Australia'],
+    ['british','country:UK'],['english','country:UK'],['england','country:UK'],['london','country:UK'],['uk','country:UK'],
+    ['american','country:USA'],['usa','country:USA'],['new york','country:USA'],
+    ['french','country:France'],['france','country:France'],['paris','country:France'],['parisian','country:France'],
+    ['spanish','country:Spain'],['spain','country:Spain'],['barcelona','country:Spain'],
+    ['danish','country:Denmark'],['denmark','country:Denmark'],['copenhagen','country:Denmark'],['scandi','region:Europe'],
+    ['italian','country:Italy'],['italy','country:Italy'],['swedish','country:Sweden'],['sweden','country:Sweden'],
+    ['dutch','country:Netherlands'],['netherlands','country:Netherlands'],['german','country:Germany'],['germany','country:Germany'],
+    ['portuguese','country:Portugal'],['portugal','country:Portugal'],['belgian','country:Belgium'],['polish','country:Poland'],['ukrainian','country:Ukraine'],
+    ['canadian','country:Canada'],['canada','country:Canada'],['mexican','country:Mexico'],['argentinian','country:Argentina'],['argentina','country:Argentina'],['colombian','country:Colombia'],
+    ['indian','country:India'],['india','country:India'],['japanese','country:Japan'],['japan','country:Japan'],['vietnamese','country:Vietnam'],['malaysian','country:Malaysia'],
+    ['turkish','country:Turkey'],['turkey','country:Turkey'],['egyptian','country:Egypt'],['lebanese','country:Lebanon']
+  ];
+  var TIER_LABELS = [['ultra luxury',7],['ultra-luxury',7],['budget',1],['accessible',2],['contemporary',3],['premium',4],['luxury',5]];
+  var STOP = {and:1,or:1,with:1,the:1,a:1,an:1,shops:1,shop:1,stores:1,store:1,that:1,sell:1,sells:1,selling:1,for:1,from:1,based:1,made:1,in:1,of:1,me:1,show:1,find:1,brands:1,brand:1,labels:1,label:1,only:1,my:1};
+  function esc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
 
-        {showSettings && (
-          <div className="mt-2 p-3 rounded-lg text-xs" style={{ backgroundColor: COLORS.paperCard, border: `1px solid ${COLORS.line}` }}>
-            <p className="break-all mb-2" style={{ color: COLORS.inkSoft }}>{sheetUrl}</p>
-            <button onClick={disconnect} className="font-medium" style={{ color: COLORS.oxblood }}>Disconnect sheet</button>
-          </div>
-        )}
+  function parseQuery(q, shops){
+    var raw = String(q || '').trim();
+    var res = {chips: [], text: ''};
+    if (!raw) return res;
+    var n = norm(raw);
+    var s =' ' + fold(raw).replace(/[–—]/g,'-').replace(/[,;/+]/g,' ').replace(/★/g,' favourites ').replace(/\s+/g,' ') + ' ';
+    function take(re, fn){ s = s.replace(re, function(){ var c = fn.apply(null, arguments); if (c) { c.src = arguments[0].trim(); res.chips.push(c); } return ' '; }); }
+    // Trip mode: "in Sydney"
+    var cities = [];
+    (shops || []).forEach(function(sh){ sh.cities.forEach(function(c){ if (cities.indexOf(c) < 0) cities.push(c); }); });
+    cities.sort(function(a,b){ return b.length - a.length; }).forEach(function(c){
+      take(new RegExp('\\s(?:in|near|at)\\s+' + esc(fold(c)) + '(?=\\s)', 'g'), function(){ return {kind:'trip', value:c}; });
+    });
+    // Tiers
+    take(/\stiers?\s*(\d)\s*(?:-|to)\s*(\d)(?=\s)/g, function(m,a,b){ a=+a; b=+b; return {kind:'tier', min:Math.min(a,b), max:Math.max(a,b)}; });
+    take(/\s(?:under|below|less than|cheaper than)\s+tier\s*(\d)(?=\s)/g, function(m,a){ return +a > 1 ? {kind:'tier', min:1, max:+a - 1} : null; });
+    take(/\s(?:up to|at most|max)\s+tier\s*(\d)(?=\s)/g, function(m,a){ return {kind:'tier', min:1, max:+a}; });
+    take(/\stier\s*(\d)\s+(?:or|and)\s+(?:under|below|less|lower)(?=\s)/g, function(m,a){ return {kind:'tier', min:1, max:+a}; });
+    take(/\s(?:over|above|more than)\s+tier\s*(\d)(?=\s)/g, function(m,a){ return +a < 7 ? {kind:'tier', min:+a + 1, max:7} : null; });
+    take(/\stier\s*(\d)\s+(?:or|and)\s+(?:over|above|up|higher)(?=\s)/g, function(m,a){ return {kind:'tier', min:+a, max:7}; });
+    take(/\stiers?\s*(\d)(?=\s)/g, function(m,a){ return {kind:'tier', min:+a, max:+a}; });
+    TIER_LABELS.forEach(function(p){ take(new RegExp('\\s' + esc(p[0]) + '(?=\\s)', 'g'), function(){ return {kind:'tier', min:p[1], max:p[1]}; }); });
+    // Favourites, shop type
+    take(/\s(?:favou?rites?|faves?|starred)(?=\s)/g, function(){ return {kind:'fav'}; });
+    take(/\s(?:vintage|second ?hand|secondhand|resale|preloved|pre-loved)(?=\s)/g, function(){ return {kind:'type', value:'Vintage & resale'}; });
+    take(/\s(?:boutiques?|multi-?brand|stockists?|retailers?)(?=\s)/g, function(){ return {kind:'type', value:'Multi-brand boutique'}; });
+    take(/\sown labels?(?=\s)/g, function(){ return {kind:'type', value:'Own label'}; });
+    OFFER_WORDS.forEach(function(p){ take(new RegExp('\\s' + esc(p[0]) + '(?=\\s)', 'g'), function(){ return {kind:'offer', value:p[1]}; }); });
+    PLACE_WORDS.forEach(function(p){ take(new RegExp('\\s' + esc(p[0]) + '(?=\\s)', 'g'), function(){ return {kind:'place', value:p[1]}; }); });
+    // De-duplicate chips
+    var seen = {};
+    res.chips = res.chips.filter(function(c){ var k = c.kind + ':' + (c.value || '') + ':' + (c.min || '') + '-' + (c.max || ''); if (seen[k]) return false; seen[k] = 1; return true; });
+    res.text = s.split(' ').filter(function(w){ return w && !STOP[w]; }).join(' ');
+    // A query with words beyond the keywords that is part of a real shop name is a name search
+    // ("Deima Knitwear", "Sororite Vintage"); a bare keyword ("knitwear") stays a filter.
+    if (res.text && res.chips.length && n.length >= 4 && shops && shops.some(function(sh){ return sh.key.indexOf(n) >= 0; })) {
+      return {chips: [], text: raw};
+    }
+    return res;
+  }
 
-        {status === 'error' && (
-          <div className="mt-2 p-2.5 rounded-lg text-xs" style={{ backgroundColor: '#FEE', color: COLORS.oxblood }}>{errorMsg}</div>
-        )}
+  function chipLabel(c){
+    if (c.kind === 'tier') return c.min === c.max ? 'Tier ' + c.min : 'Tier ' + c.min + '–' + c.max;
+    if (c.kind === 'place') return c.value.split(':')[1];
+    if (c.kind === 'fav') return '★ Favourites';
+    if (c.kind === 'trip') return 'In ' + c.value;
+    return c.value;
+  }
 
-        <div className="mt-3 flex items-center gap-2 rounded-full px-3 py-2.5" style={{ backgroundColor: COLORS.paperCard, border: `1px solid ${COLORS.line}` }}>
-          <Search size={16} color={COLORS.inkSoft} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search brand or country…" className="flex-1 bg-transparent outline-none text-sm" style={{ color: COLORS.ink }} />
-          {search && (<button onClick={() => setSearch('')} aria-label="Clear search"><X size={16} color={COLORS.inkSoft} /></button>)}
-        </div>
+  function defaultFilters(){ return {tierMin:null, tierMax:null, offers:[], types:[], places:[], favOnly:false, statuses:[], showHidden:false, trip:null}; }
 
-        <div className="mt-3 flex items-center gap-2">
-          <button onClick={() => setFiltersOpen(v => !v)} className="text-sm font-medium px-3 py-2 rounded-full" style={{ backgroundColor: filtersOpen ? COLORS.ink : COLORS.paperCard, color: filtersOpen ? COLORS.paperCard : COLORS.ink, border: `1px solid ${COLORS.line}` }}>
-            Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
-          </button>
-          <Chip active={favOnly} onClick={() => setFavOnly(v => !v)}>★ Favorites</Chip>
-          {activeFilterCount > 0 && (<button onClick={clearAll} className="text-xs font-medium underline ml-1" style={{ color: COLORS.oxblood }}>Clear</button>)}
-        </div>
+  function effective(f, chips){
+    var e = {tierMin: f.tierMin, tierMax: f.tierMax, offers: f.offers.slice(), types: f.types.slice(), places: f.places.slice(), favOnly: f.favOnly, statuses: f.statuses.slice(), showHidden: f.showHidden, trip: f.trip};
+    (chips || []).forEach(function(c){
+      if (c.kind === 'tier'){ e.tierMin = Math.max(e.tierMin || 1, c.min); e.tierMax = Math.min(e.tierMax || 7, c.max); }
+      else if (c.kind === 'offer' && e.offers.indexOf(c.value) < 0) e.offers.push(c.value);
+      else if (c.kind === 'type' && e.types.indexOf(c.value) < 0) e.types.push(c.value);
+      else if (c.kind === 'place' && e.places.indexOf(c.value) < 0) e.places.push(c.value);
+      else if (c.kind === 'fav') e.favOnly = true;
+      else if (c.kind === 'trip') e.trip = c.value;
+    });
+    return e;
+  }
 
-        {filtersOpen && (
-          <div className="mt-3 space-y-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.inkSoft }}>Category</p>
-              <div className="flex flex-wrap gap-1.5">{ALL_CATEGORIES.map(c => (<Chip key={c} active={cats.has(c)} onClick={() => toggleSetValue(setCats, cats, c)}>{c}</Chip>))}</div>
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.inkSoft }}>Price Tier</p>
-              <div className="flex flex-wrap gap-1.5">{ALL_TIERS.map(t => (<Chip key={t} active={tiers.has(t)} onClick={() => toggleSetValue(setTiers, tiers, t)}>{t} · {TIER_INFO[t].label}</Chip>))}</div>
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: COLORS.inkSoft }}>Tags</p>
-              <div className="flex flex-wrap gap-1.5">{ALL_TAGS.map(tg => (<Chip key={tg} active={tags.has(tg)} onClick={() => toggleSetValue(setTags, tags, tg)}>{tg}</Chip>))}</div>
-            </div>
-          </div>
-        )}
-      </div>
+  function isHiddenByDefault(s){ return s.avail === 'Unavailable' || s.status === 'Not for me'; }
 
-      <div className="flex-1 flex overflow-hidden relative">
-        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 pt-3 pb-6">
-          {status === 'loading' && shops.length === 0 && (
-            <div className="text-center mt-16" style={{ color: COLORS.inkSoft }}><p className="text-sm">Loading your shops…</p></div>
-          )}
-          {activeLetters.length === 0 && status !== 'loading' && (
-            <div className="text-center mt-16" style={{ color: COLORS.inkSoft }}>
-              <p className="text-sm">No shops match these filters.</p>
-              <button onClick={clearAll} className="mt-2 text-sm underline" style={{ color: COLORS.oxblood }}>Clear filters</button>
-            </div>
-          )}
-          {activeLetters.map(letter => (
-            <div key={letter} ref={el => (sectionRefs.current[letter] = el)}>
-              <div className="text-xs font-bold sticky top-0 py-1 mb-2 z-10" style={{ color: COLORS.brassDark, backgroundColor: COLORS.paper }}>{letter}</div>
-              {grouped[letter].map(shop => (<ShopCard key={shop.id} shop={shop} isFav={!!favorites[shop.id]} onToggleFav={toggle} />))}
-            </div>
-          ))}
-        </div>
+  function matches(s, e, text){
+    if (!e.showHidden && isHiddenByDefault(s)){
+      var asked = s.status === 'Not for me' && e.statuses.indexOf('Not for me') >= 0;
+      if (!asked) return false;
+    }
+    if (e.tierMin != null || e.tierMax != null){
+      if (s.tier == null) return false;
+      if (e.tierMin != null && s.tier < e.tierMin) return false;
+      if (e.tierMax != null && s.tier > e.tierMax) return false;
+    }
+    if (e.offers.length && !e.offers.some(function(o){ return s.offers.indexOf(o) >= 0; })) return false;
+    if (e.types.length && e.types.indexOf(s.type) < 0) return false;
+    if (e.places.length && !e.places.some(function(p){ var kv = p.split(':'); return kv[0] === 'region' ? s.region === kv[1] : s.based === kv[1]; })) return false;
+    if (e.favOnly && !s.fav) return false;
+    if (e.statuses.length && e.statuses.indexOf(s.status) < 0) return false;
+    if (e.trip && !s.cities.some(function(c){ return norm(c) === norm(e.trip); })) return false;
+    if (text && !nameMatches(s, text)) return false;
+    return true;
+  }
 
-        <div className="w-6 flex flex-col items-center justify-center py-2 shrink-0" style={{ backgroundColor: COLORS.paper }}>
-          <div className="flex flex-col gap-[1px] max-h-full overflow-y-auto">
-            {ALL_LETTERS.map(letter => (
-              <button key={letter} onClick={() => jumpTo(letter)} disabled={!grouped[letter]} className="text-[9px] leading-none px-0.5 py-[1.5px] font-bold" style={{ color: grouped[letter] ? COLORS.brassDark : COLORS.line }}>{letter}</button>
-            ))}
-          </div>
-        </div>
+  var collator = (typeof Intl !== 'undefined') ? new Intl.Collator('en', {sensitivity:'base', ignorePunctuation:true, numeric:true}) : null;
+  function byName(a, b){ return collator ? collator.compare(a.name, b.name) : (a.key < b.key ? -1 : a.key > b.key ? 1 : 0); }
+  var SORTS = {
+    az: {label:'A–Z', fn: byName},
+    za: {label:'Z–A', fn: function(a,b){ return byName(b,a); }},
+    tierAsc: {label:'Tier low–high', fn: function(a,b){ return (a.tier == null) - (b.tier == null) || (a.tier || 0) - (b.tier || 0) || byName(a,b); }},
+    tierDesc: {label:'Tier high–low', fn: function(a,b){ return (a.tier == null) - (b.tier == null) || (b.tier || 0) - (a.tier || 0) || byName(a,b); }},
+    added: {label:'Recently added', fn: function(a,b){ return (!a.added) - (!b.added) || (b.added > a.added ? 1 : b.added < a.added ? -1 : 0) || byName(a,b); }}
+  };
 
-        {showJumpTop && (
-          <button onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} className="absolute bottom-4 right-9 rounded-full p-2.5 shadow-md" style={{ backgroundColor: COLORS.ink, color: COLORS.paperCard }} aria-label="Jump to top">
-            <ChevronUp size={18} />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+  function run(shops, settings){
+    var parsed = parseQuery(settings.q, shops);
+    var e = effective(settings.filters, parsed.chips);
+    var list = shops.filter(function(s){ return matches(s, e, parsed.text); });
+    list.sort((SORTS[settings.sort] || SORTS.az).fn);
+    var notes = [];
+    e.offers.forEach(function(o){
+      if (!shops.some(function(s){ return s.offers.indexOf(o) >= 0; })) notes.push(o);
+    });
+    var hidden = e.showHidden ? 0 : shops.filter(function(s){ return isHiddenByDefault(s) && matches(s, Object.assign({}, e, {showHidden:true}), parsed.text); }).length;
+    return {list: list, chips: parsed.chips, text: parsed.text, effective: e, unfilledOffers: notes, hiddenCount: hidden};
+  }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<ShoppingRolladexLive />);
+  return {OFFERS:OFFERS, TYPES:TYPES, STATUSES:STATUSES, REGIONS:REGIONS, regionOf:regionOf, norm:norm, fold:fold, domainOf:domainOf,
+    parseShops:parseShops, parseGuide:parseGuide, parseQuery:parseQuery, chipLabel:chipLabel, defaultFilters:defaultFilters,
+    effective:effective, matches:matches, run:run, SORTS:SORTS, isHiddenByDefault:isHiddenByDefault, nameMatches:nameMatches};
+})();
+/* CORE END */
 </script>
+
+<script>
+(function(){
+  var CLIENT_ID = '765897251156-e328g6jmu2obg8l0855km0iqsps062n5.apps.googleusercontent.com';
+  var SHEET_ID = '10eDNZD30BmzcEMXSCWDADOEGr6Rfy6epvOzPturvRzM';
+  var SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+  var K = {settings:'rolladex.v2.settings', cache:'rolladex.v2.cache', token:'rolladex.v2.token'};
+
+  function lsGet(k){ try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch(e){ return null; } }
+  function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+  function lsDel(k){ try { localStorage.removeItem(k); } catch(e){} }
+  function h(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  var state = {
+    shops: [], guide: {}, loaded: false, syncing: false, offline: !navigator.onLine, error: '', syncedAt: null,
+    settings: Object.assign({q:'', sort:'az', filters: Core.defaultFilters()}, lsGet(K.settings) || {})
+  };
+  state.settings.filters = Object.assign(Core.defaultFilters(), state.settings.filters || {});
+  var tokenClient = null;
+
+  function save(){ lsSet(K.settings, state.settings); }
+  function token(){ var t = lsGet(K.token); return t && t.exp > Date.now() + 60000 ? t.access : null; }
+
+  // ---------- Data ----------
+  function applyData(d){
+    state.shops = Core.parseShops(d.shops);
+    state.guide = Core.parseGuide(d.guide);
+    state.loaded = true; state.syncedAt = d.at;
+  }
+  function loadCache(){ var c = lsGet(K.cache); if (c && c.shops) { try { applyData(c); } catch(e){} } }
+
+  function sync(interactive){
+    var t = token();
+    if (!t){ if (interactive) signIn(); else render(); return; }
+    state.syncing = true; state.error = ''; renderBottom();
+    var ranges = ['Shops', "'Price Tier Guide'", 'Lists'].map(function(r){ return 'ranges=' + encodeURIComponent(r); }).join('&');
+    fetch('https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + '/values:batchGet?' + ranges, {headers: {Authorization: 'Bearer ' + t}})
+      .then(function(r){
+        if (r.status === 401 || r.status === 403){ lsDel(K.token); throw new Error('auth'); }
+        if (!r.ok) throw new Error('Google Sheets replied ' + r.status + '.');
+        return r.json();
+      })
+      .then(function(j){
+        var v = j.valueRanges || [];
+        var d = {shops: (v[0] && v[0].values) || [], guide: (v[1] && v[1].values) || [], lists: (v[2] && v[2].values) || [], at: Date.now()};
+        applyData(d); lsSet(K.cache, d); state.offline = false;
+      })
+      .catch(function(e){
+        if (e.message === 'auth') state.error = 'Your sign-in has expired. Tap SYNC to sign in again.';
+        else if (!navigator.onLine) state.offline = true;
+        else state.error = 'Couldn’t reach your Sheet. ' + e.message;
+      })
+      .then(function(){ state.syncing = false; render(); });
+  }
+
+  function initAuth(){
+    if (!window.google || !google.accounts || !google.accounts.oauth2) return;
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID, scope: SCOPE,
+      callback: function(resp){
+        if (resp && resp.access_token){
+          lsSet(K.token, {access: resp.access_token, exp: Date.now() + (Number(resp.expires_in) || 3600) * 1000});
+          sync(false);
+        } else { state.error = 'Sign-in didn’t finish. Try again.'; render(); }
+      }
+    });
+  }
+  function signIn(){
+    if (!tokenClient) initAuth();
+    if (!tokenClient){ state.error = 'Google sign-in hasn’t loaded yet. Check your connection and try again.'; render(); return; }
+    tokenClient.requestAccessToken({prompt: lsGet('rolladex.v2.signedin') ? '' : 'consent'});
+    lsSet('rolladex.v2.signedin', 1);
+  }
+  window.rolladexAuthReady = function(){ initAuth(); };
+
+  // ---------- Rendering ----------
+  var I = {
+    search: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
+    sync: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4"/></svg>'
+  };
+  function pad(n){ return ('00' + n).slice(-3); }
+  function tierText(s){ return s.tier ? 'Tier ' + s.tier : ''; }
+
+  function render(){
+    if (!state.loaded && !token()) return renderSignIn();
+    renderBrowse(); renderLayer(); renderBottom();
+  }
+
+  function renderSignIn(){
+    document.getElementById('layer').hidden = true;
+    document.getElementById('bottom').innerHTML = '';
+    document.getElementById('browse').innerHTML =
+      '<div class="signin">' +
+        '<div class="topline"><span class="label">The Rolladex</span></div>' +
+        '<h1 class="masthead">SHOPPING</h1>' +
+        '<p>Your index of shops, kept in your Google Sheet.</p>' +
+        (state.error ? '<div class="err">' + h(state.error) + '</div>' : '') +
+        '<button class="primary" id="signin">Sign in with Google</button>' +
+        '<span class="muted" style="font-size:12px">Read-only access to Google Sheets.</span>' +
+      '</div>';
+    document.getElementById('signin').onclick = signIn;
+  }
+
+  var browseBuilt = false;
+  function renderBrowse(){
+    var root = document.getElementById('browse');
+    if (!browseBuilt){
+      root.innerHTML =
+        '<div class="topline"><span class="label">The Rolladex</span><button class="textbtn" id="syncbtn" aria-label="Sync with your Sheet">' + I.sync + '<span id="synclabel">Sync</span></button></div>' +
+        '<h1 class="masthead">SHOPPING</h1>' +
+        '<label class="search">' + I.search + '<input id="q" type="search" enterkeyhint="search" autocomplete="off" aria-label="Search shops" placeholder="Search — “jewellery, Australian”"></label>' +
+        '<div class="chips" id="chips"></div>' +
+        '<div class="metaline"><span id="count"></span><label><span class="sr" style="position:absolute;left:-9999px">Sort</span><select class="sortsel" id="sort"></select></label></div>' +
+        '<div id="notes"></div><div id="list"></div>';
+      var q = document.getElementById('q');
+      q.value = state.settings.q || '';
+      q.addEventListener('input', function(){ state.settings.q = q.value; save(); renderResults(); });
+      q.addEventListener('keydown', function(e){ if (e.key === 'Enter') q.blur(); });
+      var sel = document.getElementById('sort');
+      sel.innerHTML = Object.keys(Core.SORTS).map(function(k){ return '<option value="' + k + '">Sort: ' + h(Core.SORTS[k].label) + '</option>'; }).join('');
+      sel.onchange = function(){ state.settings.sort = sel.value; save(); renderResults(); };
+      document.getElementById('syncbtn').onclick = function(){ sync(true); };
+      browseBuilt = true;
+    }
+    document.getElementById('sort').value = state.settings.sort;
+    document.getElementById('synclabel').textContent = state.syncing ? 'Syncing…' : 'Sync';
+    renderResults();
+  }
+
+  function filterChips(){
+    var f = state.settings.filters, out = [];
+    if (f.tierMin != null) out.push({label: f.tierMin === f.tierMax ? 'Tier ' + f.tierMin : 'Tier ' + f.tierMin + '–' + f.tierMax, clear: function(){ f.tierMin = f.tierMax = null; }});
+    f.offers.forEach(function(o){ out.push({label: o, clear: function(){ f.offers = f.offers.filter(function(x){ return x !== o; }); }}); });
+    f.types.forEach(function(o){ out.push({label: o, clear: function(){ f.types = f.types.filter(function(x){ return x !== o; }); }}); });
+    f.places.forEach(function(o){ out.push({label: o.split(':')[1], clear: function(){ f.places = f.places.filter(function(x){ return x !== o; }); }}); });
+    if (f.favOnly) out.push({label: '★ Favourites', clear: function(){ f.favOnly = false; }});
+    f.statuses.forEach(function(o){ out.push({label: o, clear: function(){ f.statuses = f.statuses.filter(function(x){ return x !== o; }); }}); });
+    if (f.showHidden) out.push({label: 'Showing hidden', clear: function(){ f.showHidden = false; }});
+    if (f.trip) out.push({label: 'In ' + f.trip, trip: true, clear: function(){ f.trip = null; }});
+    return out;
+  }
+
+  function renderResults(){
+    if (!state.loaded){
+      document.getElementById('list').innerHTML = '<div class="skel"></div><div class="skel" style="width:45%"></div><div class="skel" style="width:70%"></div><div class="skel" style="width:52%"></div>';
+      document.getElementById('count').textContent = 'Loading…';
+      return;
+    }
+    var res = Core.run(state.shops, state.settings);
+    // Chips: those typed in search, then those set in Filters.
+    var chipsEl = document.getElementById('chips'), html = '', handlers = [];
+    res.chips.forEach(function(c, i){
+      html += '<button class="chip' + (c.kind === 'trip' ? ' trip' : '') + '" data-q="' + i + '" aria-label="Remove ' + h(Core.chipLabel(c)) + '">' + h(Core.chipLabel(c)) + ' ×</button>';
+    });
+    filterChips().forEach(function(c, i){
+      html += '<button class="chip' + (c.trip ? ' trip' : '') + '" data-f="' + i + '" aria-label="Remove ' + h(c.label) + '">' + h(c.label) + ' ×</button>';
+      handlers.push(c.clear);
+    });
+    html += '<a class="chip outline" href="#filters" style="display:inline-flex;align-items:center;text-decoration:none">Filters +</a>';
+    chipsEl.innerHTML = html;
+    Array.prototype.forEach.call(chipsEl.querySelectorAll('[data-q]'), function(b){
+      b.onclick = function(){
+        var c = res.chips[+b.getAttribute('data-q')];
+        var re = new RegExp(c.src.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i');
+        var folded = Core.fold(state.settings.q);
+        var idx = folded.search(re);
+        var q = idx >= 0 ? state.settings.q.slice(0, idx) + state.settings.q.slice(idx + c.src.length) : state.settings.q;
+        state.settings.q = q.replace(/\s{2,}/g,' ').replace(/^[\s,]+|[\s,]+$/g,''); save();
+        document.getElementById('q').value = state.settings.q; renderResults();
+      };
+    });
+    Array.prototype.forEach.call(chipsEl.querySelectorAll('[data-f]'), function(b){
+      b.onclick = function(){ handlers[+b.getAttribute('data-f')](); save(); renderResults(); };
+    });
+
+    document.getElementById('count').textContent = res.list.length + ' of ' + state.shops.length + ' shops';
+
+    var notes = '';
+    if (res.unfilledOffers.length){
+      notes += '<div class="notice">' + h(res.unfilledOffers.join(', ')) + ' isn’t filled in yet. Most shops are still marked just “Clothing” until the Offers column is broken down in Phase 3.</div>';
+    }
+    if (res.hiddenCount){
+      notes += '<div class="notice"><b>' + res.hiddenCount + ' hidden</b> (unavailable or “Not for me”). <button class="textbtn" id="showhidden" style="min-height:32px;text-decoration:underline">Show them</button></div>';
+    }
+    document.getElementById('notes').innerHTML = notes;
+    var sh = document.getElementById('showhidden');
+    if (sh) sh.onclick = function(){ state.settings.filters.showHidden = true; save(); renderResults(); };
+
+    if (!res.list.length){
+      document.getElementById('list').innerHTML = '<div class="empty"><p>Nothing in the index matches.</p><button class="secondary" id="clearall" style="margin:0 auto">Clear filters</button></div>';
+      document.getElementById('clearall').onclick = clearAll;
+      return;
+    }
+    document.getElementById('list').innerHTML = res.list.map(function(s, i){
+      var dim = Core.isHiddenByDefault(s);
+      var right = s.avail === 'Unavailable' ? 'UNAVAILABLE' : s.status === 'Not for me' ? 'NOT FOR ME' : (s.fav ? '<span class="star" aria-label="Favourite">★</span> ' : '') + h(tierText(s).toUpperCase());
+      var pills = s.offers.slice(0, 3).map(function(o){ return '<span class="pill">' + h(o) + '</span>'; }).join('') + (s.offers.length > 3 ? '<span class="pill">+' + (s.offers.length - 3) + '</span>' : '');
+      if (s.type === 'Vintage & resale') pills = '<span class="pill">Vintage</span>' + pills;
+      return '<a class="row' + (dim ? ' dim' : '') + (s.avail === 'Unavailable' ? ' gone' : '') + '" href="#shop/' + encodeURIComponent(s.id) + '">' +
+        '<span class="num">' + pad(i + 1) + '</span>' +
+        '<span class="body"><span class="top"><span class="name' + (s.fav ? ' hl' : '') + '">' + h(s.name) + '</span><span class="tier' + (s.fav || dim ? '' : ' muted') + '">' + right + '</span></span>' +
+        '<span class="pills">' + pills + '</span></span></a>';
+    }).join('');
+  }
+
+  function clearAll(){ state.settings.q = ''; state.settings.filters = Core.defaultFilters(); save(); document.getElementById('q').value = ''; renderResults(); renderLayer(); }
+
+  function renderBottom(){
+    var b = document.getElementById('bottom'), route = location.hash.slice(1), bar = '';
+    if (state.offline) bar = '<div class="bar"><span>Offline · showing your last copy</span></div>';
+    else if (state.error) bar = '<div class="bar"><span>' + h(state.error) + '</span><button id="barsync">Sync</button></div>';
+    else if (state.loaded && !token() && !state.syncing) bar = '<div class="bar"><span>Showing your saved copy' + (state.syncedAt ? ' from ' + h(new Date(state.syncedAt).toLocaleDateString('en-AU', {day:'numeric', month:'short'})) : '') + '</span><button id="barsync">Sync</button></div>';
+    if (route) { b.innerHTML = ''; return; }
+    b.innerHTML = '<div>' + bar + '<a class="primary" aria-disabled="true" href="#" onclick="return false" title="Adding shops arrives in Phase 2">+ Add a shop · Phase 2</a></div>';
+    var bs = document.getElementById('barsync'); if (bs) bs.onclick = function(){ sync(true); };
+  }
+
+  // ---------- Layers (detail, filters, pickers) ----------
+  function renderLayer(){
+    var route = location.hash.slice(1), L = document.getElementById('layer');
+    if (!route || !state.loaded){ L.hidden = true; L.innerHTML = ''; document.body.style.overflow = ''; renderBottom(); return; }
+    L.hidden = false; document.body.style.overflow = 'hidden';
+    if (route.indexOf('shop/') === 0) renderDetail(L, decodeURIComponent(route.slice(5)));
+    else if (route === 'filters') renderFilters(L);
+    else if (route === 'filters/places') renderPicker(L, 'places');
+    else if (route === 'filters/trip') renderPicker(L, 'trip');
+    else { location.hash = ''; }
+    renderBottom();
+  }
+
+  function renderDetail(L, id){
+    var s = state.shops.filter(function(x){ return x.id === id; })[0];
+    if (!s){ L.innerHTML = '<div class="wrap"><div class="topline"><a class="textbtn" href="#">‹ Index</a></div><p class="notice">That shop isn’t in the Sheet any more.</p></div>'; return; }
+    var res = Core.run(state.shops, state.settings), pos = res.list.indexOf(s);
+    var domain = Core.domainOf(s.link), href = '';
+    try { href = s.link ? new URL(/^https?:/i.test(s.link) ? s.link : 'https://' + s.link).href : ''; } catch(e){}
+    var initials = s.name.replace(/[^A-Za-zÀ-ÿ0-9 ]/g,'').split(' ').filter(Boolean).slice(0,2).map(function(w){ return w[0]; }).join('').toUpperCase() || '·';
+    var g = state.guide[s.tier] || {};
+    var place = [s.type, s.based].filter(Boolean).join(', ');
+    function kv(k, v){ return v ? '<div class="kv"><span class="label">' + h(k) + '</span><span class="v">' + h(v) + '</span></div>' : ''; }
+    var stores = s.cities.length ? s.cities.join(', ') + (s.storeDetails ? ' · ' + s.storeDetails : '') : '';
+    L.innerHTML = '<div class="wrap">' +
+      '<div class="topline"><a class="textbtn" href="#" id="back">‹ Index</a><span class="label">' + (pos >= 0 ? 'No. ' + pad(pos + 1) : h(s.id)) + '</span></div>' +
+      '<div style="display:flex;gap:14px;align-items:flex-start;padding:20px 0 8px">' +
+        '<div style="flex:1;min-width:0"><h1 class="detailname"><span class="' + (s.fav ? 'hl' : '') + '">' + h(s.name) + '</span></h1></div>' +
+        '<div class="logo" aria-hidden="true">' + (domain ? '<img alt="" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=128" onload="if(this.naturalWidth<=16){this.parentNode.textContent=\'' + h(initials) + '\'}" onerror="this.parentNode.textContent=\'' + h(initials) + '\'">' : h(initials)) + '</div>' +
+      '</div>' +
+      '<div class="standfirst" style="padding-bottom:14px">' + h(place) + '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;padding-bottom:14px">' +
+        (s.fav ? '<span class="badge">★ Favourite</span>' : '') +
+        (s.status ? '<span class="badge" style="border-color:var(--ink);color:var(--ink)">' + h(s.status.toUpperCase()) + '</span>' : '') +
+        (s.avail === 'Unavailable' ? '<span class="badge" style="border-color:var(--ink);color:var(--ink)">UNAVAILABLE</span>' : '') +
+      '</div>' +
+      '<div class="stats">' +
+        '<div><span class="label">Tier</span><span class="big">' + (s.tier || '—') + '</span><span class="small">' + h(s.tierLabel || 'To fill') + '</span></div>' +
+        '<div><span class="label">Ships AU</span><span class="big">' + h(s.ships || '—') + '</span><span class="small">' + (s.ships ? '' : 'To fill') + '</span></div>' +
+        '<div><span class="label">Currency</span><span class="big" style="font-size:' + (s.currency && s.currency.length > 4 ? '16px' : '30px') + '">' + h(s.currency || '—') + '</span><span class="small">' + (s.currency ? '' : 'To fill') + '</span></div>' +
+      '</div>' +
+      kv('Core item', s.priceNote || (g.price ? 'Tier ' + s.tier + ' guide: ' + g.price : '')) +
+      kv('Shipping', s.shipNote) + kv('Stores', stores) + kv('Notes', s.notes) + kv('Added', s.added) +
+      (s.offers.length ? '<div class="pills" style="padding:16px 0">' + s.offers.map(function(o){ return '<span class="pill lg">' + h(o) + '</span>'; }).join('') + '</div>' : '') +
+      '<div style="display:flex;gap:8px;padding-top:16px">' +
+        (href ? '<a class="primary" style="flex:1" href="' + h(href) + '" target="_blank" rel="noopener">Visit ' + h(domain) + ' ↗</a>' : '<span class="primary" aria-disabled="true" style="flex:1">No link yet</span>') +
+        '<span class="secondary" aria-disabled="true" title="Editing arrives in Phase 2">Edit</span>' +
+      '</div></div>';
+    document.getElementById('back').onclick = function(e){ e.preventDefault(); history.length > 1 ? history.back() : (location.hash = ''); };
+    L.scrollTop = 0;
+  }
+
+  function counts(field){
+    var c = {};
+    state.shops.forEach(function(s){ if (Core.isHiddenByDefault(s) && !state.settings.filters.showHidden) return; var v = s[field]; (Array.isArray(v) ? v : [v]).forEach(function(x){ if (x) c[x] = (c[x] || 0) + 1; }); });
+    return c;
+  }
+
+  function renderFilters(L){
+    var f = state.settings.filters, res = Core.run(state.shops, state.settings);
+    var lo = f.tierMin, hi = f.tierMax, g = state.guide;
+    var tierVal = lo == null ? 'Any' : lo === hi ? String(lo) : lo + ' – ' + hi;
+    var cap = lo == null ? 'Tap one tier, or two to set a range.' : ((g[lo] || {}).label || '') + (hi !== lo ? ' to ' + ((g[hi] || {}).label || '') : '') + ' · ' + priceRange(lo, hi) + ' core item';
+    var oc = counts('offers'), tc = counts('type'), sc = counts('status');
+    var placeVal = f.places.length ? f.places.map(function(p){ return p.split(':')[1]; }).join(', ') : 'Anywhere';
+    var hiddenTotal = state.shops.filter(Core.isHiddenByDefault).length;
+    L.innerHTML = '<div class="wrap">' +
+      '<div class="pagetitle"><h1>INDEX</h1><button class="textbtn" id="clear" style="text-decoration:underline">Clear all</button></div>' +
+      '<div class="sect"><div class="head"><span class="label">I. Price tier</span><span class="val"><span class="hl">' + h(tierVal) + '</span></span></div>' +
+        '<div class="tiers" role="group" aria-label="Price tier">' + [1,2,3,4,5,6,7].map(function(t){ var on = lo != null && t >= lo && t <= hi; return '<button data-t="' + t + '" aria-pressed="' + on + '" aria-label="Tier ' + t + ' ' + h((g[t] || {}).label || '') + '">' + t + '</button>'; }).join('') + '</div>' +
+        '<div class="caption">' + h(cap) + '</div></div>' +
+      '<div class="sect"><div class="head"><span class="label">II. Offers</span></div><div style="display:flex;flex-wrap:wrap;gap:8px">' +
+        Core.OFFERS.map(function(o){ return '<button class="offerbtn" data-o="' + h(o) + '" aria-pressed="' + (f.offers.indexOf(o) >= 0) + '">' + h(o) + '<span class="n">' + (oc[o] || 0) + '</span></button>'; }).join('') + '</div></div>' +
+      '<div class="sect"><div class="head"><span class="label">III. Shop type</span></div>' +
+        Core.TYPES.map(function(t){ return '<label class="check"><span>' + h(t) + '<span class="n">' + (tc[t] || 0) + '</span></span><input type="checkbox" data-ty="' + h(t) + '"' + (f.types.indexOf(t) >= 0 ? ' checked' : '') + '></label>'; }).join('') + '</div>' +
+      '<a class="navrow" href="#filters/places" style="text-decoration:none;color:var(--ink)"><span style="display:flex;flex-direction:column;gap:4px"><span class="label">IV. Based in</span><span class="val">' + h(placeVal) + '</span></span><span style="font-size:20px">›</span></a>' +
+      '<a class="navrow" href="#filters/trip" style="text-decoration:none;color:var(--ink)"><span style="display:flex;flex-direction:column;gap:4px"><span class="label">V. Trip mode</span><span class="val' + (f.trip ? '' : ' muted') + '">' + h(f.trip || 'Off') + '</span></span><span style="font-size:20px">›</span></a>' +
+      '<div class="sect"><div class="head"><span class="label">VI. Yours</span></div>' +
+        '<label class="check"><span>★ Favourites only</span><input type="checkbox" id="fav"' + (f.favOnly ? ' checked' : '') + '></label>' +
+        Core.STATUSES.map(function(t){ return '<label class="check"><span>' + h(t) + '<span class="n">' + (sc[t] || 0) + '</span></span><input type="checkbox" data-st="' + h(t) + '"' + (f.statuses.indexOf(t) >= 0 ? ' checked' : '') + '></label>'; }).join('') +
+        '<label class="check"><span>Show unavailable and “Not for me”<span class="n">' + hiddenTotal + '</span></span><input type="checkbox" id="hid"' + (f.showHidden ? ' checked' : '') + '></label>' +
+      '</div>' +
+      '<div style="padding-top:20px"><a class="primary" href="#" id="done">Show ' + res.list.length + ' shops</a></div>' +
+    '</div>';
+    function upd(){ save(); renderResults(); var st = L.scrollTop; renderFilters(L); L.scrollTop = st; }
+    Array.prototype.forEach.call(L.querySelectorAll('[data-t]'), function(b){ b.onclick = function(){
+      var t = +b.getAttribute('data-t');
+      if (f.tierMin == null) { f.tierMin = f.tierMax = t; }
+      else if (f.tierMin === f.tierMax) { if (t === f.tierMin) f.tierMin = f.tierMax = null; else { f.tierMin = Math.min(t, f.tierMin); f.tierMax = Math.max(t, f.tierMax); } }
+      else { f.tierMin = f.tierMax = t; }
+      upd();
+    }; });
+    Array.prototype.forEach.call(L.querySelectorAll('[data-o]'), function(b){ b.onclick = function(){ var o = b.getAttribute('data-o'); var i = f.offers.indexOf(o); i >= 0 ? f.offers.splice(i, 1) : f.offers.push(o); upd(); }; });
+    Array.prototype.forEach.call(L.querySelectorAll('[data-ty]'), function(b){ b.onchange = function(){ var o = b.getAttribute('data-ty'); var i = f.types.indexOf(o); i >= 0 ? f.types.splice(i, 1) : f.types.push(o); upd(); }; });
+    Array.prototype.forEach.call(L.querySelectorAll('[data-st]'), function(b){ b.onchange = function(){ var o = b.getAttribute('data-st'); var i = f.statuses.indexOf(o); i >= 0 ? f.statuses.splice(i, 1) : f.statuses.push(o); upd(); }; });
+    document.getElementById('fav').onchange = function(){ f.favOnly = this.checked; upd(); };
+    document.getElementById('hid').onchange = function(){ f.showHidden = this.checked; upd(); };
+    document.getElementById('clear').onclick = function(){ state.settings.filters = Core.defaultFilters(); save(); renderResults(); renderFilters(L); };
+    document.getElementById('done').onclick = function(e){ e.preventDefault(); location.hash = ''; };
+  }
+
+  function priceRange(lo, hi){
+    var g = state.guide, a = (g[lo] || {}).price || '', b = (g[hi] || {}).price || '';
+    if (lo === hi) return a;
+    var from = a.replace(/^Under\s*/i, '$0 - ').split(/\s*-\s*/)[0], to = b.split(/\s*-\s*/).pop();
+    return (from || '') + '–' + (to || '');
+  }
+
+  function renderPicker(L, kind){
+    var f = state.settings.filters, html = '';
+    if (kind === 'places'){
+      var byC = counts('based'), byR = counts('region');
+      html = '<div class="sect"><div class="head"><span class="label">Regions</span></div>' +
+        Core.REGIONS.filter(function(r){ return byR[r]; }).map(function(r){ var v = 'region:' + r; return '<label class="check"><span>' + h(r) + '<span class="n">' + byR[r] + '</span></span><input type="checkbox" data-p="' + h(v) + '"' + (f.places.indexOf(v) >= 0 ? ' checked' : '') + '></label>'; }).join('') + '</div>' +
+        '<div class="sect"><div class="head"><span class="label">Countries</span></div>' +
+        Object.keys(byC).sort().map(function(c){ var v = 'country:' + c; return '<label class="check"><span>' + h(c) + '<span class="n">' + byC[c] + '</span></span><input type="checkbox" data-p="' + h(v) + '"' + (f.places.indexOf(v) >= 0 ? ' checked' : '') + '></label>'; }).join('') + '</div>';
+    } else {
+      var cc = counts('cities');
+      var cities = Object.keys(cc).sort();
+      html = '<div class="sect"><p class="standfirst" style="margin:0 0 8px">Only shops with a store in one city. Your other filters still apply.</p>' +
+        '<label class="check"><span>Off</span><input type="radio" name="trip" data-c=""' + (!f.trip ? ' checked' : '') + '></label>' +
+        cities.map(function(c){ return '<label class="check"><span>' + h(c) + '<span class="n">' + cc[c] + '</span></span><input type="radio" name="trip" data-c="' + h(c) + '"' + (f.trip === c ? ' checked' : '') + '></label>'; }).join('') +
+        (cities.length ? '' : '<p class="muted">No shops have a Store city yet.</p>') + '</div>';
+    }
+    L.innerHTML = '<div class="wrap"><div class="pagetitle"><h1>' + (kind === 'places' ? 'BASED IN' : 'TRIP MODE') + '</h1><a class="textbtn" href="#filters">Done</a></div>' + html + '</div>';
+    Array.prototype.forEach.call(L.querySelectorAll('[data-p]'), function(b){ b.onchange = function(){ var v = b.getAttribute('data-p'); var i = f.places.indexOf(v); i >= 0 ? f.places.splice(i, 1) : f.places.push(v); save(); renderResults(); }; });
+    Array.prototype.forEach.call(L.querySelectorAll('[data-c]'), function(b){ b.onchange = function(){ f.trip = b.getAttribute('data-c') || null; save(); renderResults(); location.hash = 'filters'; }; });
+  }
+
+  // ---------- Start ----------
+  window.addEventListener('hashchange', renderLayer);
+  window.addEventListener('online', function(){ state.offline = false; sync(false); });
+  window.addEventListener('offline', function(){ state.offline = true; renderBottom(); });
+  loadCache();
+  render();
+  if (token()) sync(false);
+})();
+</script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="window.rolladexAuthReady && window.rolladexAuthReady()"></script>
 </body>
 </html>
