@@ -121,6 +121,8 @@ a{color:var(--ink)}
 .selectbtn{position:relative;display:block}
 .selectbtn select{width:100%;height:48px;border:1px solid var(--ink);border-radius:0;background:var(--paper);font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;text-align:center;text-align-last:center;-webkit-appearance:none;appearance:none;padding:0 24px}
 .selectbtn::after{content:"▾";position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;pointer-events:none}
+.rvrow{padding:10px 0;border-top:1px solid var(--hairline)}
+.rvinput{width:100%;border:none;border-bottom:1px solid var(--ink);border-radius:0;background:transparent;font-family:var(--serif);font-size:17px;min-height:40px;padding:2px 0}
 @media (prefers-reduced-motion:no-preference){.layer{animation:up .2s ease-out}@keyframes up{from{transform:translateY(16px);opacity:.6}to{transform:none;opacity:1}}}
 </style>
 </head>
@@ -488,7 +490,44 @@ var Core = (function(){
     return {apply: apply, read: read, guard: guard};
   }
 
-  return {OFFERS:OFFERS, TYPES:TYPES, STATUSES:STATUSES, REGIONS:REGIONS, regionOf:regionOf, norm:norm, fold:fold, domainOf:domainOf,
+  // ================= Phase 3: review batches =================
+  // A batch code is "RLDX1." + base64url(JSON). Each item: {id, name, fields: {<Sheet header>: {v, src, conf}}, flags: [..]}.
+  var BATCH_FIELDS = ['Offers', 'Price note', 'Ships to AU', 'Shipping note', 'Currency', 'Store cities', 'Store details'];
+  function decodeBatch(code){
+    var raw = String(code || '').trim();
+    if (raw.charAt(0) === '{'){ var j = JSON.parse(raw); if (!j || !Array.isArray(j.items)) throw new Error('That file isn’t a batch.'); return j; }
+    var s = raw.replace(/\s+/g, '');
+    if (s.indexOf('RLDX1.') !== 0) throw new Error('That doesn’t look like a batch code. It should start with RLDX1.');
+    var b64 = s.slice(6).replace(/-/g, '+').replace(/_/g, '/'); while (b64.length % 4) b64 += '=';
+    var bin = (typeof atob === 'function') ? atob(b64) : Buffer.from(b64, 'base64').toString('binary');
+    var bytes = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    var json = new TextDecoder().decode(bytes), b = JSON.parse(json);
+    if (!b || !Array.isArray(b.items)) throw new Error('The batch code is incomplete. Copy the whole code and try again.');
+    return b;
+  }
+  // What to pre-tick: fill empty cells; for Offers, accept when it only adds to what's there.
+  function proposals(batch, values){
+    var head = values[0] || [];
+    return batch.items.map(function(it){
+      var i = rowIndexOf(values, it.id), row = i >= 0 ? values[i] : null;
+      var rows = BATCH_FIELDS.filter(function(f){ return it.fields && it.fields[f]; }).map(function(f){
+        var p = it.fields[f], c = head.map(norm).indexOf(norm(f));
+        var now = row && c >= 0 ? String(row[c] == null ? '' : row[c]).trim() : '';
+        var v = String(p.v == null ? '' : p.v).trim(), keep = true, removes = [];
+        if (f === 'Offers'){
+          var a = list(now), b = list(v);
+          removes = a.filter(function(x){ return b.indexOf(x) < 0; });
+          v = b.sort(function(x, y){ return OFFERS.indexOf(x) - OFFERS.indexOf(y); }).join(', ');
+          keep = removes.length === 0;
+        } else keep = now === '';
+        return {field: f, now: now, value: v, src: p.src || '', conf: p.conf || 'confirmed', accept: keep && v !== now && v !== '', same: v === now, removes: removes};
+      }).filter(function(r){ return !r.same; });
+      return {id: it.id, name: it.name, found: !!row, rows: rows, flags: it.flags || []};
+    });
+  }
+
+  return {BATCH_FIELDS:BATCH_FIELDS, decodeBatch:decodeBatch, proposals:proposals,
+    OFFERS:OFFERS, TYPES:TYPES, STATUSES:STATUSES, REGIONS:REGIONS, regionOf:regionOf, norm:norm, fold:fold, domainOf:domainOf,
     parseShops:parseShops, parseGuide:parseGuide, parseQuery:parseQuery, chipLabel:chipLabel, defaultFilters:defaultFilters,
     effective:effective, matches:matches, run:run, SORTS:SORTS, isHiddenByDefault:isHiddenByDefault, nameMatches:nameMatches,
     TIER_KEYS:TIER_KEYS, SHIPS:SHIPS, CURRENCIES:CURRENCIES, AVAIL:AVAIL, HEAD:HEAD, cleanLink:cleanLink, siteKey:siteKey, guessName:guessName,
@@ -693,7 +732,7 @@ var Core = (function(){
     var root = $('browse');
     if (!browseBuilt){
       root.innerHTML =
-        '<div class="topline"><span class="label">The Rolladex</span><button class="textbtn" id="syncbtn" aria-label="Sync with your Sheet">' + I.sync + '<span id="synclabel">Sync</span></button></div>' +
+        '<div class="topline"><span class="label">The Rolladex</span><span style="display:flex;gap:18px"><a class="textbtn" href="#review">Review batch</a><button class="textbtn" id="syncbtn" aria-label="Sync with your Sheet">' + I.sync + '<span id="synclabel">Sync</span></button></span></div>' +
         '<h1 class="masthead">SHOPPING</h1>' +
         '<label class="search">' + I.search + '<input id="q" type="search" enterkeyhint="search" autocomplete="off" aria-label="Search shops" placeholder="Search — “jewellery, Australian”"></label>' +
         '<div class="chips" id="chips"></div>' +
@@ -810,6 +849,7 @@ var Core = (function(){
     else if (route === 'filters/places') renderPicker(L, 'places');
     else if (route === 'filters/trip') renderPicker(L, 'trip');
     else if (route === 'conflict') renderConflict(L);
+    else if (route === 'review') { if (formFor !== 'review') { formFor = 'review'; renderReview(L); } }
     else { location.hash = ''; }
     renderBottom();
   }
@@ -982,6 +1022,78 @@ var Core = (function(){
     if (!edit) setTimeout(function(){ $('f-link') && $('f-link').focus(); }, 50);
   }
 
+  // ---------- Review batch (Phase 3) ----------
+  var review = null;   // {batch, items}
+  function renderReview(L){
+    var done = lsGet('rolladex.v2.batches') || {};
+    if (!review){
+      L.innerHTML = '<div class="wrap"><div class="pagetitle"><h1>REVIEW</h1><a class="textbtn" href="#" id="rvclose">Close</a></div>' +
+        '<p class="standfirst" style="padding:16px 0 4px">Paste a batch code from Claude. You’ll see each suggestion next to what’s in your Sheet now, with its source, before anything is saved.</p>' +
+        (Object.keys(done).length ? '<p class="caption">Saved so far: batch ' + Object.keys(done).sort(function(a,b){return a-b;}).join(', ') + '</p>' : '') +
+        '<label class="field" for="rvcode"><span class="label">Batch code</span><textarea id="rvcode" rows="5" autocapitalize="off" spellcheck="false" placeholder="RLDX1.…" style="font-family:var(--sans);font-style:normal;font-size:13px;word-break:break-all"></textarea></label>' +
+        '<div id="rverr" aria-live="assertive"></div>' +
+        '<div style="padding-top:20px"><button class="primary" id="rvload">Load batch</button></div>' +
+        '<div style="padding-top:12px"><label class="secondary" style="width:100%;cursor:pointer">Or choose a batch file<input type="file" id="rvfile" accept=".txt,.json,text/plain,application/json" style="position:absolute;left:-9999px"></label></div></div>';
+      $('rvfile').onchange = function(){
+        var f = this.files && this.files[0]; if (!f) return;
+        f.text().then(function(t){ $('rvcode').value = t; $('rvload').click(); });
+      };
+      $('rvclose').onclick = function(e){ e.preventDefault(); formFor = null; location.hash = ''; };
+      $('rvload').onclick = function(){
+        try {
+          var b = Core.decodeBatch($('rvcode').value);
+          review = {batch: b, items: Core.proposals(b, state.data.shops)};
+          renderReview(L);
+        } catch(e){ $('rverr').innerHTML = '<div class="err" style="margin-top:16px">' + h(e.message) + '</div>'; }
+      };
+      return;
+    }
+    var b = review.batch, items = review.items, total = 0;
+    items.forEach(function(it){ it.rows.forEach(function(r){ if (r.accept) total++; }); });
+    L.innerHTML = '<div class="wrap"><div class="pagetitle"><h1>BATCH ' + h(b.batch || '') + '</h1><a class="textbtn" href="#" id="rvback">Change</a></div>' +
+      '<p class="caption" style="padding-top:8px">' + h(items.length + ' shops' + (b.rates ? ' · prices converted at ' + b.rates : '')) + '. Ticked suggestions only fill empty cells. Edit any value before saving.</p>' +
+      items.map(function(it, i){
+        return '<div class="sect"><div class="head"><a class="val" style="text-transform:uppercase;text-decoration:none" href="#shop/' + encodeURIComponent(it.id) + '">' + h(it.name) + '</a><span class="label muted">' + h(it.id) + '</span></div>' +
+          (it.found ? '' : '<div class="err">This shop isn’t in your Sheet any more, so it will be skipped.</div>') +
+          it.flags.map(function(f){ return '<div class="notice" style="background:var(--lilac);padding:8px 10px;border:none;margin-bottom:8px;font-size:14px">' + h(f) + '</div>'; }).join('') +
+          (it.rows.length ? it.rows.map(function(r, j){
+            return '<div class="rvrow">' +
+              '<label class="check" style="min-height:32px"><span class="label">' + h(r.field) + (r.conf === 'likely' ? ' <span class="muted">· likely</span>' : '') + '</span><input type="checkbox" data-a="' + i + ':' + j + '"' + (r.accept ? ' checked' : '') + (it.found ? '' : ' disabled') + '></label>' +
+              '<div class="caption" style="margin:0 0 4px">Now: ' + (r.now ? h(r.now) : '<i>empty</i>') + (r.removes.length ? ' · <b>would remove ' + h(r.removes.join(', ')) + '</b>' : '') + '</div>' +
+              (r.value.length > 32
+                ? '<textarea class="rvinput" rows="2" data-v="' + i + ':' + j + '" aria-label="' + h(it.name + ' ' + r.field) + '" style="resize:vertical">' + h(r.value) + '</textarea>'
+                : '<input class="rvinput" data-v="' + i + ':' + j + '" value="' + h(r.value) + '" aria-label="' + h(it.name + ' ' + r.field) + '">') +
+              (r.src ? '<a class="caption" style="display:inline-block;margin-top:4px" href="' + h(r.src) + '" target="_blank" rel="noopener">Source ↗</a>' : '') +
+            '</div>';
+          }).join('') : '<p class="caption">Nothing new to add.</p>') + '</div>';
+      }).join('') +
+      '<div id="rverr" aria-live="assertive"></div>' +
+      '<div style="padding-top:20px"><button class="primary" id="rvsave">Save ' + total + ' change' + (total === 1 ? '' : 's') + '</button></div></div>';
+    $('rvback').onclick = function(e){ e.preventDefault(); review = null; renderReview(L); };
+    each(L, '[data-a]', function(cb){ cb.onchange = function(){ var k = cb.getAttribute('data-a').split(':'); items[+k[0]].rows[+k[1]].accept = cb.checked; var st = L.scrollTop; renderReview(L); L.scrollTop = st; }; });
+    each(L, '[data-v]', function(inp){ inp.oninput = function(){ var k = inp.getAttribute('data-v').split(':'); var r = items[+k[0]].rows[+k[1]]; r.value = inp.value; if (!r.accept){ r.accept = true; var cb = L.querySelector('[data-a="' + k.join(':') + '"]'); if (cb) cb.checked = true; } }; });
+    $('rvsave').onclick = function(){
+      var ops = [];
+      items.forEach(function(it){
+        if (!it.found) return;
+        var cells = {};
+        it.rows.forEach(function(r){ if (r.accept) cells[r.field] = r.value.trim(); });
+        var hs = Object.keys(cells); if (!hs.length) return;
+        var base = rawCells(it.id, hs);
+        hs.forEach(function(k){ if (cells[k] === base[k]) { delete cells[k]; delete base[k]; } });
+        if (Object.keys(cells).length) ops.push({op: 'update', id: it.id, cells: cells, base: base});
+      });
+      if (!ops.length){ $('rverr').innerHTML = '<div class="err" style="margin-top:16px">Nothing is ticked.</div>'; return; }
+      done[b.batch || '?'] = Date.now(); lsSet('rolladex.v2.batches', done);
+      review = null; formFor = null; location.replace('#');
+      ops.forEach(function(op, k){ if (k < ops.length - 1) { op.ts = Date.now(); state.data = Object.assign({}, state.data, {shops: Core.applyLocal(state.data.shops, op)}); state.queue.push(op); } });
+      applyData(state.data); lsSet(K.queue, state.queue);
+      enqueue(ops[ops.length - 1], true);
+      toast(ops.length + ' shops updated from batch ' + (b.batch || ''));
+    };
+    L.scrollTop = 0;
+  }
+
   // ---------- Conflict ----------
   function renderConflict(L){
     var c = state.conflict;
@@ -1079,6 +1191,8 @@ var Core = (function(){
   render();
   if (token()) sync(false);
   window.__rolladex = {state: state, flush: flush, sync: sync};
+  // Offline helper: lets the app open with no signal (needs sw.js next to this file).
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(function(){});
 })();
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="window.rolladexAuthReady && window.rolladexAuthReady()"></script>
