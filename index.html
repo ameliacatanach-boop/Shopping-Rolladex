@@ -93,8 +93,8 @@ a{color:var(--ink)}
 .navrow .val{font-weight:400}
 .detailname{font-family:var(--serif);font-size:56px;font-weight:800;line-height:.98;margin:0;text-transform:uppercase;overflow-wrap:anywhere}
 .standfirst{font-family:var(--serif);font-style:italic;font-size:17px;color:#333}
-.logo{width:56px;height:56px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--pill);font-family:var(--serif);font-weight:800;font-size:20px;overflow:hidden}
-.logo img{width:40px;height:40px;object-fit:contain}
+.logo{width:56px;height:56px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--pill);font-family:var(--serif);font-weight:800;font-size:20px;overflow:hidden;color:var(--ink)}
+.logo img{width:34px;height:34px;object-fit:contain;filter:grayscale(1) contrast(1.15);mix-blend-mode:multiply}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:3px solid var(--ink);border-bottom:1px solid var(--ink)}
 .stats > div{padding:12px 10px;display:flex;flex-direction:column;gap:6px;border-left:1px solid var(--ink);min-width:0}
 .stats > div:first-child{border-left:none;background:var(--lilac)}
@@ -107,6 +107,20 @@ a{color:var(--ink)}
 .signin{min-height:100vh;display:flex;flex-direction:column;justify-content:center;gap:24px}
 .signin p{font-family:var(--serif);font-style:italic;font-size:20px;margin:0}
 .err{background:var(--lilac);padding:12px 14px;font-size:14px;line-height:1.4}
+.field{display:flex;flex-direction:column;gap:6px;padding-top:16px}
+.field input,.field select,.field textarea{border:none;border-bottom:1px solid var(--ink);border-radius:0;background:transparent;font-family:var(--serif);font-size:19px;min-height:44px;padding:4px 0;width:100%;-webkit-appearance:none;appearance:none}
+.field select{font-family:var(--sans);font-size:16px;background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);background-position:calc(100% - 9px) 55%,calc(100% - 4px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:20px}
+.field textarea{font-style:italic;font-size:17px;resize:vertical}
+.field input::placeholder,.field textarea::placeholder{color:var(--muted);font-size:16px}
+.field .tiers{margin-top:2px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:end}
+.dupe{margin-top:14px;padding:14px 16px;background:var(--lilac);display:flex;justify-content:space-between;align-items:center;gap:12px}
+.duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding-top:16px}
+.secondary.fav{height:48px;font-size:12px;border-color:var(--lilac-deep);color:var(--lilac-deep)}
+.secondary.fav.on{background:var(--lilac);color:var(--ink)}
+.selectbtn{position:relative;display:block}
+.selectbtn select{width:100%;height:48px;border:1px solid var(--ink);border-radius:0;background:var(--paper);font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;text-align:center;text-align-last:center;-webkit-appearance:none;appearance:none;padding:0 24px}
+.selectbtn::after{content:"▾";position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12px;pointer-events:none}
 @media (prefers-reduced-motion:no-preference){.layer{animation:up .2s ease-out}@keyframes up{from{transform:translateY(16px);opacity:.6}to{transform:none;opacity:1}}}
 </style>
 </head>
@@ -338,9 +352,148 @@ var Core = (function(){
     return {list: list, chips: parsed.chips, text: parsed.text, effective: e, unfilledOffers: notes, hiddenCount: hidden};
   }
 
+  // ================= Phase 2: adding, editing, deleting =================
+  var TIER_KEYS = ['', '1 - Budget', '2 - Accessible', '3 - Contemporary', '4 - Premium', '5 - Luxury', '6 - Designer', '7 - Ultra Luxury'];
+  var SHIPS = ['Yes', 'No', 'Unknown'];
+  var CURRENCIES = ['AUD', 'Foreign, converted at checkout', 'Foreign only'];
+  var AVAIL = ['Available', 'Unavailable'];
+  // Shop field -> Sheet header.
+  var HEAD = {id:'ID', fav:'Favourite', name:'Name', link:'Link', type:'Shop type', based:'Based in', tier:'Price tier', priceNote:'Price note',
+    offers:'Offers', ships:'Ships to AU', shipNote:'Shipping note', currency:'Currency', cities:'Store cities', storeDetails:'Store details',
+    status:'Status', avail:'Availability', notes:'Notes', added:'Date added', visited:'Last visited'};
+
+  function cleanLink(s){
+    s = String(s || '').trim(); if (!s) return '';
+    if (!/^https?:\/\//i.test(s)) s = 'https://' + s.replace(/^\/+/, '');
+    try { var u = new URL(s); return (u.protocol === 'http:' ? 'https:' : u.protocol) + '//' + u.host + (u.pathname === '/' ? '' : u.pathname.replace(/\/$/, '')) + u.search; } catch(e){ return s; }
+  }
+  // Registrable part of the domain: aemery.com, kowtowclothing.com (from au.kowtowclothing.com), baserange.net.au.
+  function siteKey(link){
+    var host = domainOf(link).toLowerCase(); if (!host) return '';
+    var p = host.split('.');
+    if (p.length >= 3 && p[p.length - 1].length === 2 && ['com','co','net','org','gov','edu','ac','or','ne'].indexOf(p[p.length - 2]) >= 0) return p.slice(-3).join('.');
+    return p.slice(-2).join('.');
+  }
+  function brandOf(link){ return siteKey(link).split('.')[0]; }
+  function guessName(link){
+    var b = brandOf(link); if (!b) return '';
+    try { b = decodeURIComponent(b); } catch(e){}
+    if (/^xn--/.test(b)) return '';
+    b = b.replace(/^(shop|the|wear|get|try)(?=[a-z]{3,})/, '').replace(/(official|shop|store|online)$/, function(m, x, i){ return i >= 3 ? '' : m; });
+    return b.split(/[-_]+/).filter(Boolean).map(function(w){ return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+  }
+  function lev(a, b){
+    var prev = [], cur = [], i, j; for (j = 0; j <= b.length; j++) prev[j] = j;
+    for (i = 1; i <= a.length; i++){ cur = [i]; for (j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i-1] === b[j-1] ? 0 : 1)); prev = cur; }
+    return prev[b.length];
+  }
+  function findDuplicates(shops, name, link, excludeId){
+    var out = [], k = link ? siteKey(link) : '', br = k ? k.split('.')[0] : '', n = norm(name);
+    shops.forEach(function(s){
+      if (s.id === excludeId) return;
+      var why = '';
+      var sk = s.link ? siteKey(s.link) : '';
+      if (k && sk && sk === k) why = 'Same website';
+      else if (br && br.length >= 4 && sk && sk.split('.')[0] === br) why = 'Same name, different website';
+      else if (n && s.key === n) why = 'Same name';
+      else if (n.length >= 5 && Math.abs(s.key.length - n.length) <= 1 && lev(s.key, n) <= 1) why = 'Similar name';
+      if (why) out.push({shop: s, why: why});
+    });
+    return out;
+  }
+  function nextId(values){
+    var col = (values[0] || []).map(norm).indexOf('id'), max = 0;
+    values.slice(1).forEach(function(r){ var m = String(r[col] || '').match(/^S(\d+)$/); if (m) max = Math.max(max, +m[1]); });
+    var n = String(max + 1); while (n.length < 3) n = '0' + n; return 'S' + n;
+  }
+  function localDate(d){ d = d || new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  // Turn edited field values into Sheet cells, keyed by header name.
+  function toCells(fields){
+    var c = {};
+    Object.keys(fields).forEach(function(k){
+      if (!HEAD[k]) return; var v = fields[k];
+      if (k === 'fav') v = v ? '★' : '';
+      else if (k === 'tier') v = v ? TIER_KEYS[+v] || '' : '';
+      else if (k === 'offers') v = (v || []).slice().sort(function(a, b){ return OFFERS.indexOf(a) - OFFERS.indexOf(b); }).join(', ');
+      else if (k === 'cities') v = (Array.isArray(v) ? v : list(v)).join(', ');
+      else if (k === 'link') v = cleanLink(v);
+      else v = v == null ? '' : String(v).trim();
+      c[HEAD[k]] = v;
+    });
+    return c;
+  }
+  function colOf(header, name){ return header.map(norm).indexOf(norm(name)); }
+  function colLetter(i){ var s = ''; i++; while (i > 0){ var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function rowIndexOf(values, id){ var c = colOf(values[0] || [], 'ID'); for (var i = 1; i < values.length; i++) if (String(values[i][c] || '').trim() === id) return i; return -1; }
+  // Apply a change to a local copy of the Shops values (used for instant updates and the offline queue).
+  function applyLocal(values, op){
+    var v = values.map(function(r){ return r.slice(); }), head = v[0];
+    if (op.op === 'add'){
+      var row = head.map(function(hd){ return op.cells[hd] != null ? op.cells[hd] : (hd === 'ID' ? op.id : ''); });
+      row[colOf(head, 'ID')] = op.id; v.push(row);
+    } else {
+      var i = rowIndexOf(v, op.id); if (i < 0) return v;
+      if (op.op === 'delete') v.splice(i, 1);
+      else Object.keys(op.cells).forEach(function(hd){ var c = colOf(head, hd); if (c >= 0){ while (v[i].length <= c) v[i].push(''); v[i][c] = op.cells[hd]; } });
+    }
+    return v;
+  }
+
+  // Writes to Google Sheets. Every request goes through guard(): only the Rolladex Sheet, only the Shops tab.
+  function makeWriter(opt){
+    var API = 'https://sheets.googleapis.com/v4/spreadsheets/';
+    function guard(sheetId, range){
+      if (sheetId !== opt.sheetId) throw new Error('Blocked: refusing to write to a Sheet that isn’t the Rolladex (' + sheetId + ').');
+      if (range && !/^Shops(!|$)/.test(range)) throw new Error('Blocked: refusing to write outside the Shops tab (' + range + ').');
+      return API + sheetId;
+    }
+    function read(sheetId){ return opt.request('GET', guard(sheetId) + '/values/Shops').then(function(j){ return j.values || []; }); }
+    function apply(sheetId, op){
+      var base = guard(sheetId);
+      return read(sheetId).then(function(values){
+        var head = values[0] || [];
+        if (colOf(head, 'ID') < 0) throw new Error('The Shops tab has no ID column.');
+        if (op.op === 'add'){
+          var id = op.id;
+          if (!id || rowIndexOf(values, id) >= 0) id = nextId(values);
+          var cells = Object.assign({}, op.cells); cells.ID = id;
+          var row = head.map(function(hd){ return cells[hd] != null ? cells[hd] : ''; });
+          guard(sheetId, 'Shops!A1');
+          return opt.request('POST', base + '/values/' + encodeURIComponent('Shops!A1') + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', {values: [row]})
+            .then(function(){ return {status: 'ok', id: id}; });
+        }
+        var i = rowIndexOf(values, op.id);
+        if (i < 0) return {status: op.op === 'delete' ? 'ok' : 'missing'};
+        if (op.op === 'delete'){
+          return opt.request('GET', base + '?fields=sheets.properties(sheetId,title)').then(function(meta){
+            var sh = (meta.sheets || []).map(function(s){ return s.properties; }).filter(function(p){ return p.title === 'Shops'; })[0];
+            if (!sh) throw new Error('Couldn’t find the Shops tab.');
+            return opt.request('POST', base + ':batchUpdate', {requests: [{deleteDimension: {range: {sheetId: sh.sheetId, dimension: 'ROWS', startIndex: i, endIndex: i + 1}}}]});
+          }).then(function(){ return {status: 'ok'}; });
+        }
+        // Update: only the changed cells; stop if someone changed the same cells in the Sheet meanwhile.
+        var conflicts = [];
+        Object.keys(op.cells).forEach(function(hd){
+          var c = colOf(head, hd); if (c < 0) return;
+          var now = String(values[i][c] == null ? '' : values[i][c]).trim();
+          if (op.base && hd in op.base && hd !== 'Last visited' && now !== String(op.base[hd]).trim() && now !== op.cells[hd]) conflicts.push({field: hd, sheet: now, mine: op.cells[hd], was: op.base[hd]});
+        });
+        if (conflicts.length && !op.force) return {status: 'conflict', conflicts: conflicts};
+        var data = Object.keys(op.cells).map(function(hd){ var c = colOf(head, hd); return c < 0 ? null : {range: 'Shops!' + colLetter(c) + (i + 1), values: [[op.cells[hd]]]}; }).filter(Boolean);
+        data.forEach(function(d){ guard(sheetId, d.range); });
+        if (!data.length) return {status: 'ok'};
+        return opt.request('POST', base + '/values:batchUpdate', {valueInputOption: 'RAW', data: data}).then(function(){ return {status: 'ok'}; });
+      });
+    }
+    return {apply: apply, read: read, guard: guard};
+  }
+
   return {OFFERS:OFFERS, TYPES:TYPES, STATUSES:STATUSES, REGIONS:REGIONS, regionOf:regionOf, norm:norm, fold:fold, domainOf:domainOf,
     parseShops:parseShops, parseGuide:parseGuide, parseQuery:parseQuery, chipLabel:chipLabel, defaultFilters:defaultFilters,
-    effective:effective, matches:matches, run:run, SORTS:SORTS, isHiddenByDefault:isHiddenByDefault, nameMatches:nameMatches};
+    effective:effective, matches:matches, run:run, SORTS:SORTS, isHiddenByDefault:isHiddenByDefault, nameMatches:nameMatches,
+    TIER_KEYS:TIER_KEYS, SHIPS:SHIPS, CURRENCIES:CURRENCIES, AVAIL:AVAIL, HEAD:HEAD, cleanLink:cleanLink, siteKey:siteKey, guessName:guessName,
+    findDuplicates:findDuplicates, nextId:nextId, localDate:localDate, toCells:toCells, applyLocal:applyLocal, rowIndexOf:rowIndexOf,
+    colLetter:colLetter, makeWriter:makeWriter};
 })();
 /* CORE END */
 </script>
@@ -349,75 +502,164 @@ var Core = (function(){
 (function(){
   var CLIENT_ID = '765897251156-e328g6jmu2obg8l0855km0iqsps062n5.apps.googleusercontent.com';
   var SHEET_ID = '10eDNZD30BmzcEMXSCWDADOEGr6Rfy6epvOzPturvRzM';
-  var SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
-  var K = {settings:'rolladex.v2.settings', cache:'rolladex.v2.cache', token:'rolladex.v2.token'};
+  var SCOPE_READ = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+  var SCOPE_WRITE = 'https://www.googleapis.com/auth/spreadsheets';
+  var K = {settings:'rolladex.v2.settings', cache:'rolladex.v2.cache', token:'rolladex.v2.token', queue:'rolladex.v2.queue'};
+  var API_BASE = window.ROLLADEX_API_BASE || 'https://sheets.googleapis.com/v4/spreadsheets/';
 
   function lsGet(k){ try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch(e){ return null; } }
   function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
   function lsDel(k){ try { localStorage.removeItem(k); } catch(e){} }
   function h(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function $(id){ return document.getElementById(id); }
+  function each(root, sel, fn){ Array.prototype.forEach.call(root.querySelectorAll(sel), fn); }
 
   var state = {
-    shops: [], guide: {}, loaded: false, syncing: false, offline: !navigator.onLine, error: '', syncedAt: null,
+    data: null, shops: [], guide: {}, loaded: false, syncing: false, flushing: false, offline: !navigator.onLine, error: '', toast: '',
+    queue: lsGet(K.queue) || [], conflict: null,
     settings: Object.assign({q:'', sort:'az', filters: Core.defaultFilters()}, lsGet(K.settings) || {})
   };
   state.settings.filters = Object.assign(Core.defaultFilters(), state.settings.filters || {});
-  var tokenClient = null;
+  var readClient = null, writeClient = null, afterAuth = null;
 
   function save(){ lsSet(K.settings, state.settings); }
-  function token(){ var t = lsGet(K.token); return t && t.exp > Date.now() + 60000 ? t.access : null; }
+  function tok(){ var t = lsGet(K.token); return t && t.exp > Date.now() + 60000 ? t : null; }
+  function token(){ var t = tok(); return t ? t.access : null; }
+  function canWrite(){ var t = tok(); return !!(t && t.write); }
 
   // ---------- Data ----------
   function applyData(d){
+    state.data = d;
     state.shops = Core.parseShops(d.shops);
     state.guide = Core.parseGuide(d.guide);
-    state.loaded = true; state.syncedAt = d.at;
+    state.loaded = true;
   }
-  function loadCache(){ var c = lsGet(K.cache); if (c && c.shops) { try { applyData(c); } catch(e){} } }
+  function loadCache(){ var c = lsGet(K.cache); if (c && c.shops) { try { applyData(c); replayQueue(); } catch(e){} } }
+  // Re-apply changes that haven't reached the Sheet yet on top of the last copy.
+  function replayQueue(){
+    if (!state.data || !state.queue.length) return;
+    var v = state.data.shops; state.queue.forEach(function(op){ v = Core.applyLocal(v, op); });
+    applyData(Object.assign({}, state.data, {shops: v}));
+  }
 
-  function sync(interactive){
+  function request(method, url, body){
     var t = token();
-    if (!t){ if (interactive) signIn(); else render(); return; }
-    state.syncing = true; state.error = ''; renderBottom();
-    var ranges = ['Shops', "'Price Tier Guide'", 'Lists'].map(function(r){ return 'ranges=' + encodeURIComponent(r); }).join('&');
-    fetch('https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + '/values:batchGet?' + ranges, {headers: {Authorization: 'Bearer ' + t}})
+    if (!t) return Promise.reject(new Error('auth'));
+    url = url.replace('https://sheets.googleapis.com/v4/spreadsheets/', API_BASE);
+    return fetch(url, {method: method, headers: Object.assign({Authorization: 'Bearer ' + t}, body ? {'Content-Type': 'application/json'} : {}), body: body ? JSON.stringify(body) : undefined})
       .then(function(r){
-        if (r.status === 401 || r.status === 403){ lsDel(K.token); throw new Error('auth'); }
+        if (r.status === 401) { lsDel(K.token); throw new Error('auth'); }
+        if (r.status === 403) throw new Error('forbidden');
         if (!r.ok) throw new Error('Google Sheets replied ' + r.status + '.');
         return r.json();
-      })
+      });
+  }
+  var writer = Core.makeWriter({sheetId: SHEET_ID, request: request});
+
+  function sync(interactive){
+    if (!token()){ if (interactive) auth(false, function(){ sync(false); }); else render(); return; }
+    if (state.queue.length) return flush(interactive);
+    state.syncing = true; state.error = ''; renderBottom();
+    var ranges = ['Shops', "'Price Tier Guide'", 'Lists'].map(function(r){ return 'ranges=' + encodeURIComponent(r); }).join('&');
+    request('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + '/values:batchGet?' + ranges)
       .then(function(j){
         var v = j.valueRanges || [];
         var d = {shops: (v[0] && v[0].values) || [], guide: (v[1] && v[1].values) || [], lists: (v[2] && v[2].values) || [], at: Date.now()};
-        applyData(d); lsSet(K.cache, d); state.offline = false;
+        lsSet(K.cache, d); applyData(d); replayQueue(); state.offline = false;
       })
-      .catch(function(e){
-        if (e.message === 'auth') state.error = 'Your sign-in has expired. Tap SYNC to sign in again.';
-        else if (!navigator.onLine) state.offline = true;
-        else state.error = 'Couldn’t reach your Sheet. ' + e.message;
-      })
+      .catch(function(e){ failed(e); })
       .then(function(){ state.syncing = false; render(); });
   }
+  function failed(e){
+    if (e.message === 'auth') state.error = 'Your sign-in has expired. Tap Sync to sign in again.';
+    else if (e.message === 'forbidden') state.error = 'Google refused access to the Sheet. Tap Sync to sign in again.';
+    else if (!navigator.onLine || e instanceof TypeError) state.offline = true;
+    else state.error = 'Couldn’t reach your Sheet. ' + e.message;
+  }
 
+  // ---------- Sign-in ----------
+  function onToken(write){
+    return function(resp){
+      var cb = afterAuth; afterAuth = null;
+      if (resp && resp.access_token){
+        var w = write || /auth\/spreadsheets(\s|$)/.test(resp.scope || '');
+        lsSet(K.token, {access: resp.access_token, exp: Date.now() + (Number(resp.expires_in) || 3600) * 1000, write: w});
+        state.error = '';
+        if (cb) cb(); else sync(false);
+      } else { state.error = 'Sign-in didn’t finish. Try again.'; render(); }
+    };
+  }
   function initAuth(){
     if (!window.google || !google.accounts || !google.accounts.oauth2) return;
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID, scope: SCOPE,
-      callback: function(resp){
-        if (resp && resp.access_token){
-          lsSet(K.token, {access: resp.access_token, exp: Date.now() + (Number(resp.expires_in) || 3600) * 1000});
-          sync(false);
-        } else { state.error = 'Sign-in didn’t finish. Try again.'; render(); }
-      }
-    });
+    readClient = google.accounts.oauth2.initTokenClient({client_id: CLIENT_ID, scope: SCOPE_READ, callback: onToken(false)});
+    writeClient = google.accounts.oauth2.initTokenClient({client_id: CLIENT_ID, scope: SCOPE_WRITE, include_granted_scopes: true, callback: onToken(true)});
   }
-  function signIn(){
-    if (!tokenClient) initAuth();
-    if (!tokenClient){ state.error = 'Google sign-in hasn’t loaded yet. Check your connection and try again.'; render(); return; }
-    tokenClient.requestAccessToken({prompt: lsGet('rolladex.v2.signedin') ? '' : 'consent'});
-    lsSet('rolladex.v2.signedin', 1);
+  // Read access to browse; write access is only asked for the first time something changes.
+  function auth(write, then){
+    if (!readClient) initAuth();
+    if (!readClient){ state.error = 'Google sign-in hasn’t loaded yet. Check your connection and try again.'; render(); return; }
+    afterAuth = then || null;
+    var asked = lsGet('rolladex.v2.asked') || {};
+    var useWrite = write || asked.write;
+    (useWrite ? writeClient : readClient).requestAccessToken({prompt: asked[useWrite ? 'write' : 'read'] ? '' : 'consent'});
+    asked[useWrite ? 'write' : 'read'] = 1; lsSet('rolladex.v2.asked', asked);
   }
   window.rolladexAuthReady = function(){ initAuth(); };
+
+  // ---------- Changes: apply instantly, then send to the Sheet in order ----------
+  function enqueue(op, interactive){
+    op.ts = Date.now();
+    state.data = Object.assign({}, state.data, {shops: Core.applyLocal(state.data.shops, op)});
+    applyData(state.data);
+    state.queue.push(op); lsSet(K.queue, state.queue);
+    render();
+    flush(interactive);
+  }
+  function flush(interactive){
+    if (state.flushing || !state.queue.length) return;
+    if (!navigator.onLine){ state.offline = true; renderBottom(); return; }
+    if (!canWrite()){
+      if (interactive) auth(true, function(){ flush(false); });
+      else renderBottom();
+      return;
+    }
+    state.flushing = true; state.error = ''; renderBottom();
+    (function next(){
+      var op = state.queue[0];
+      if (!op){ state.flushing = false; toast('Saved to your Sheet'); return sync(false); }
+      writer.apply(SHEET_ID, op).then(function(res){
+        if (res.status === 'conflict'){ state.flushing = false; state.conflict = {op: op, conflicts: res.conflicts}; location.hash = 'conflict'; render(); return; }
+        if (res.status === 'missing') toast('That shop is no longer in the Sheet, so the change was skipped.');
+        if (op.op === 'add' && res.id && res.id !== op.id) renameLocal(op.id, res.id);
+        state.queue.shift(); lsSet(K.queue, state.queue);
+        next();
+      }).catch(function(e){
+        state.flushing = false; failed(e);
+        if (/^Blocked/.test(e.message)){ state.error = e.message; state.queue.shift(); lsSet(K.queue, state.queue); }
+        render();
+      });
+    })();
+  }
+  function renameLocal(from, to){
+    state.queue.forEach(function(o){ if (o.id === from) o.id = to; });
+    var v = state.data.shops, i = Core.rowIndexOf(v, from);
+    if (i >= 0){ v = v.map(function(r){ return r.slice(); }); v[i][v[0].indexOf('ID')] = to; applyData(Object.assign({}, state.data, {shops: v})); }
+    if (location.hash === '#shop/' + from) location.replace('#shop/' + to);
+  }
+  function rawCells(id, headers){
+    var v = state.data.shops, i = Core.rowIndexOf(v, id), out = {};
+    headers.forEach(function(hd){ var c = v[0].indexOf(hd); out[hd] = i >= 0 && c >= 0 ? String(v[i][c] == null ? '' : v[i][c]).trim() : ''; });
+    return out;
+  }
+  function update(id, fields, interactive){
+    var cells = Core.toCells(fields), base = rawCells(id, Object.keys(cells));
+    Object.keys(cells).forEach(function(k){ if (cells[k] === base[k]) { delete cells[k]; delete base[k]; } });
+    if (!Object.keys(cells).length) return false;
+    enqueue({op: 'update', id: id, cells: cells, base: base}, interactive);
+    return true;
+  }
+  var toastTimer = null;
+  function toast(msg){ state.toast = msg; renderBottom(); clearTimeout(toastTimer); toastTimer = setTimeout(function(){ state.toast = ''; renderBottom(); }, 2600); }
 
   // ---------- Rendering ----------
   var I = {
@@ -433,43 +675,42 @@ var Core = (function(){
   }
 
   function renderSignIn(){
-    document.getElementById('layer').hidden = true;
-    document.getElementById('bottom').innerHTML = '';
-    document.getElementById('browse').innerHTML =
+    $('layer').hidden = true; $('bottom').innerHTML = ''; browseBuilt = false;
+    $('browse').innerHTML =
       '<div class="signin">' +
         '<div class="topline"><span class="label">The Rolladex</span></div>' +
         '<h1 class="masthead">SHOPPING</h1>' +
         '<p>Your index of shops, kept in your Google Sheet.</p>' +
         (state.error ? '<div class="err">' + h(state.error) + '</div>' : '') +
         '<button class="primary" id="signin">Sign in with Google</button>' +
-        '<span class="muted" style="font-size:12px">Read-only access to Google Sheets.</span>' +
+        '<span class="muted" style="font-size:12px">Read-only to start. The app asks to edit the Sheet only when you first add or change a shop.</span>' +
       '</div>';
-    document.getElementById('signin').onclick = signIn;
+    $('signin').onclick = function(){ auth(false); };
   }
 
   var browseBuilt = false;
   function renderBrowse(){
-    var root = document.getElementById('browse');
+    var root = $('browse');
     if (!browseBuilt){
       root.innerHTML =
         '<div class="topline"><span class="label">The Rolladex</span><button class="textbtn" id="syncbtn" aria-label="Sync with your Sheet">' + I.sync + '<span id="synclabel">Sync</span></button></div>' +
         '<h1 class="masthead">SHOPPING</h1>' +
         '<label class="search">' + I.search + '<input id="q" type="search" enterkeyhint="search" autocomplete="off" aria-label="Search shops" placeholder="Search — “jewellery, Australian”"></label>' +
         '<div class="chips" id="chips"></div>' +
-        '<div class="metaline"><span id="count"></span><label><span class="sr" style="position:absolute;left:-9999px">Sort</span><select class="sortsel" id="sort"></select></label></div>' +
+        '<div class="metaline"><span id="count"></span><label><span style="position:absolute;left:-9999px">Sort</span><select class="sortsel" id="sort"></select></label></div>' +
         '<div id="notes"></div><div id="list"></div>';
-      var q = document.getElementById('q');
+      var q = $('q');
       q.value = state.settings.q || '';
       q.addEventListener('input', function(){ state.settings.q = q.value; save(); renderResults(); });
       q.addEventListener('keydown', function(e){ if (e.key === 'Enter') q.blur(); });
-      var sel = document.getElementById('sort');
+      var sel = $('sort');
       sel.innerHTML = Object.keys(Core.SORTS).map(function(k){ return '<option value="' + k + '">Sort: ' + h(Core.SORTS[k].label) + '</option>'; }).join('');
       sel.onchange = function(){ state.settings.sort = sel.value; save(); renderResults(); };
-      document.getElementById('syncbtn').onclick = function(){ sync(true); };
+      $('syncbtn').onclick = function(){ sync(true); };
       browseBuilt = true;
     }
-    document.getElementById('sort').value = state.settings.sort;
-    document.getElementById('synclabel').textContent = state.syncing ? 'Syncing…' : 'Sync';
+    $('sort').value = state.settings.sort;
+    $('synclabel').textContent = state.syncing || state.flushing ? 'Syncing…' : 'Sync';
     renderResults();
   }
 
@@ -487,14 +728,14 @@ var Core = (function(){
   }
 
   function renderResults(){
+    if (!browseBuilt) return;
     if (!state.loaded){
-      document.getElementById('list').innerHTML = '<div class="skel"></div><div class="skel" style="width:45%"></div><div class="skel" style="width:70%"></div><div class="skel" style="width:52%"></div>';
-      document.getElementById('count').textContent = 'Loading…';
+      $('list').innerHTML = '<div class="skel"></div><div class="skel" style="width:45%"></div><div class="skel" style="width:70%"></div><div class="skel" style="width:52%"></div>';
+      $('count').textContent = 'Loading…';
       return;
     }
     var res = Core.run(state.shops, state.settings);
-    // Chips: those typed in search, then those set in Filters.
-    var chipsEl = document.getElementById('chips'), html = '', handlers = [];
+    var chipsEl = $('chips'), html = '', handlers = [];
     res.chips.forEach(function(c, i){
       html += '<button class="chip' + (c.kind === 'trip' ? ' trip' : '') + '" data-q="' + i + '" aria-label="Remove ' + h(Core.chipLabel(c)) + '">' + h(Core.chipLabel(c)) + ' ×</button>';
     });
@@ -504,40 +745,32 @@ var Core = (function(){
     });
     html += '<a class="chip outline" href="#filters" style="display:inline-flex;align-items:center;text-decoration:none">Filters +</a>';
     chipsEl.innerHTML = html;
-    Array.prototype.forEach.call(chipsEl.querySelectorAll('[data-q]'), function(b){
+    each(chipsEl, '[data-q]', function(b){
       b.onclick = function(){
         var c = res.chips[+b.getAttribute('data-q')];
         var re = new RegExp(c.src.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i');
-        var folded = Core.fold(state.settings.q);
-        var idx = folded.search(re);
+        var idx = Core.fold(state.settings.q).search(re);
         var q = idx >= 0 ? state.settings.q.slice(0, idx) + state.settings.q.slice(idx + c.src.length) : state.settings.q;
         state.settings.q = q.replace(/\s{2,}/g,' ').replace(/^[\s,]+|[\s,]+$/g,''); save();
-        document.getElementById('q').value = state.settings.q; renderResults();
+        $('q').value = state.settings.q; renderResults();
       };
     });
-    Array.prototype.forEach.call(chipsEl.querySelectorAll('[data-f]'), function(b){
-      b.onclick = function(){ handlers[+b.getAttribute('data-f')](); save(); renderResults(); };
-    });
+    each(chipsEl, '[data-f]', function(b){ b.onclick = function(){ handlers[+b.getAttribute('data-f')](); save(); renderResults(); }; });
 
-    document.getElementById('count').textContent = res.list.length + ' of ' + state.shops.length + ' shops';
+    $('count').textContent = res.list.length + ' of ' + state.shops.length + ' shops';
 
     var notes = '';
-    if (res.unfilledOffers.length){
-      notes += '<div class="notice">' + h(res.unfilledOffers.join(', ')) + ' isn’t filled in yet. Most shops are still marked just “Clothing” until the Offers column is broken down in Phase 3.</div>';
-    }
-    if (res.hiddenCount){
-      notes += '<div class="notice"><b>' + res.hiddenCount + ' hidden</b> (unavailable or “Not for me”). <button class="textbtn" id="showhidden" style="min-height:32px;text-decoration:underline">Show them</button></div>';
-    }
-    document.getElementById('notes').innerHTML = notes;
-    var sh = document.getElementById('showhidden');
-    if (sh) sh.onclick = function(){ state.settings.filters.showHidden = true; save(); renderResults(); };
+    if (res.unfilledOffers.length) notes += '<div class="notice">' + h(res.unfilledOffers.join(', ')) + ' isn’t filled in yet. Most shops are still marked just “Clothing” until the Offers column is broken down in Phase 3.</div>';
+    if (res.hiddenCount) notes += '<div class="notice"><b>' + res.hiddenCount + ' hidden</b> (unavailable or “Not for me”). <button class="textbtn" id="showhidden" style="min-height:32px;text-decoration:underline">Show them</button></div>';
+    $('notes').innerHTML = notes;
+    var sh = $('showhidden'); if (sh) sh.onclick = function(){ state.settings.filters.showHidden = true; save(); renderResults(); };
 
     if (!res.list.length){
-      document.getElementById('list').innerHTML = '<div class="empty"><p>Nothing in the index matches.</p><button class="secondary" id="clearall" style="margin:0 auto">Clear filters</button></div>';
-      document.getElementById('clearall').onclick = clearAll;
+      $('list').innerHTML = '<div class="empty"><p>Nothing in the index matches.</p><button class="secondary" id="clearall" style="margin:0 auto">Clear filters</button></div>';
+      $('clearall').onclick = clearAll;
       return;
     }
-    document.getElementById('list').innerHTML = res.list.map(function(s, i){
+    $('list').innerHTML = res.list.map(function(s, i){
       var dim = Core.isHiddenByDefault(s);
       var right = s.avail === 'Unavailable' ? 'UNAVAILABLE' : s.status === 'Not for me' ? 'NOT FOR ME' : (s.fav ? '<span class="star" aria-label="Favourite">★</span> ' : '') + h(tierText(s).toUpperCase());
       var pills = s.offers.slice(0, 3).map(function(o){ return '<span class="pill">' + h(o) + '</span>'; }).join('') + (s.offers.length > 3 ? '<span class="pill">+' + (s.offers.length - 3) + '</span>' : '');
@@ -549,38 +782,50 @@ var Core = (function(){
     }).join('');
   }
 
-  function clearAll(){ state.settings.q = ''; state.settings.filters = Core.defaultFilters(); save(); document.getElementById('q').value = ''; renderResults(); renderLayer(); }
+  function clearAll(){ state.settings.q = ''; state.settings.filters = Core.defaultFilters(); save(); $('q').value = ''; renderResults(); renderLayer(); }
 
   function renderBottom(){
-    var b = document.getElementById('bottom'), route = location.hash.slice(1), bar = '';
-    if (state.offline) bar = '<div class="bar"><span>Offline · showing your last copy</span></div>';
-    else if (state.error) bar = '<div class="bar"><span>' + h(state.error) + '</span><button id="barsync">Sync</button></div>';
-    else if (state.loaded && !token() && !state.syncing) bar = '<div class="bar"><span>Showing your saved copy' + (state.syncedAt ? ' from ' + h(new Date(state.syncedAt).toLocaleDateString('en-AU', {day:'numeric', month:'short'})) : '') + '</span><button id="barsync">Sync</button></div>';
-    if (route) { b.innerHTML = ''; return; }
-    b.innerHTML = '<div>' + bar + '<a class="primary" aria-disabled="true" href="#" onclick="return false" title="Adding shops arrives in Phase 2">+ Add a shop · Phase 2</a></div>';
-    var bs = document.getElementById('barsync'); if (bs) bs.onclick = function(){ sync(true); };
+    var b = $('bottom'), route = location.hash.slice(1), bar = '', n = state.queue.length;
+    if (state.toast) bar = '<div class="bar" role="status"><span>' + h(state.toast) + '</span></div>';
+    else if (state.flushing) bar = '<div class="bar" role="status"><span>Saving ' + n + ' change' + (n === 1 ? '' : 's') + ' to your Sheet…</span></div>';
+    else if (n) bar = '<div class="bar" role="status"><span>' + n + ' change' + (n === 1 ? '' : 's') + ' waiting' + (state.offline ? ' · offline' : '') + '</span><button id="barsync">Sync</button></div>';
+    else if (state.offline) bar = '<div class="bar" role="status"><span>Offline · showing your last copy</span></div>';
+    else if (state.error) bar = '<div class="bar" role="status"><span>' + h(state.error) + '</span><button id="barsync">Sync</button></div>';
+    else if (state.loaded && !token() && !state.syncing) bar = '<div class="bar" role="status"><span>Showing your saved copy' + (state.data && state.data.at ? ' from ' + h(new Date(state.data.at).toLocaleDateString('en-AU', {day:'numeric', month:'short'})) : '') + '</span><button id="barsync">Sync</button></div>';
+    if (route && route !== '' ){ b.innerHTML = bar ? '<div>' + bar + '</div>' : ''; }
+    else b.innerHTML = '<div>' + bar + '<a class="primary" href="#add">+ Add a shop</a></div>';
+    var bs = $('barsync'); if (bs) bs.onclick = function(){ sync(true); };
   }
 
-  // ---------- Layers (detail, filters, pickers) ----------
+  // ---------- Layers ----------
+  var formFor = null;
   function renderLayer(){
-    var route = location.hash.slice(1), L = document.getElementById('layer');
-    if (!route || !state.loaded){ L.hidden = true; L.innerHTML = ''; document.body.style.overflow = ''; renderBottom(); return; }
+    var route = location.hash.slice(1), L = $('layer');
+    if (!route || !state.loaded){ L.hidden = true; L.innerHTML = ''; formFor = null; document.body.style.overflow = ''; renderBottom(); return; }
     L.hidden = false; document.body.style.overflow = 'hidden';
-    if (route.indexOf('shop/') === 0) renderDetail(L, decodeURIComponent(route.slice(5)));
-    else if (route === 'filters') renderFilters(L);
+    if (route.indexOf('shop/') === 0) { formFor = null; renderDetail(L, decodeURIComponent(route.slice(5))); }
+    else if (route === 'add') renderForm(L, null);
+    else if (route.indexOf('edit/') === 0) renderForm(L, decodeURIComponent(route.slice(5)));
+    else if (route === 'filters') { formFor = null; renderFilters(L); }
     else if (route === 'filters/places') renderPicker(L, 'places');
     else if (route === 'filters/trip') renderPicker(L, 'trip');
+    else if (route === 'conflict') renderConflict(L);
     else { location.hash = ''; }
     renderBottom();
   }
+  function goBack(fallback){ if (history.length > 1) history.back(); else location.hash = fallback || ''; }
+  function shopById(id){ return state.shops.filter(function(x){ return x.id === id; })[0]; }
+  function hrefOf(link){ try { return link ? new URL(/^https?:/i.test(link) ? link : 'https://' + link).href : ''; } catch(e){ return ''; } }
+  function initialsOf(name){ return String(name).split(/[^A-Za-zÀ-ÿ0-9]+/).filter(Boolean).slice(0,2).map(function(w){ return w[0]; }).join('').toUpperCase() || '·'; }
 
   function renderDetail(L, id){
-    var s = state.shops.filter(function(x){ return x.id === id; })[0];
+    var s = shopById(id);
     if (!s){ L.innerHTML = '<div class="wrap"><div class="topline"><a class="textbtn" href="#">‹ Index</a></div><p class="notice">That shop isn’t in the Sheet any more.</p></div>'; return; }
     var res = Core.run(state.shops, state.settings), pos = res.list.indexOf(s);
-    var domain = Core.domainOf(s.link), href = '';
-    try { href = s.link ? new URL(/^https?:/i.test(s.link) ? s.link : 'https://' + s.link).href : ''; } catch(e){}
-    var initials = s.name.replace(/[^A-Za-zÀ-ÿ0-9 ]/g,'').split(' ').filter(Boolean).slice(0,2).map(function(w){ return w[0]; }).join('').toUpperCase() || '·';
+    var domain = Core.domainOf(s.link), href = hrefOf(s.link), initials = initialsOf(s.name);
+    var src = domain ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=128' : '';
+    var fallback = 'this.parentNode.textContent=\'' + h(initials) + '\'';
+    var tile = src ? '<div class="logo" aria-hidden="true"><img alt="" src="' + src + '" onload="if(this.naturalWidth<=16){' + fallback + '}" onerror="' + fallback + '"></div>' : '<div class="logo" aria-hidden="true">' + h(initials) + '</div>';
     var g = state.guide[s.tier] || {};
     var place = [s.type, s.based].filter(Boolean).join(', ');
     function kv(k, v){ return v ? '<div class="kv"><span class="label">' + h(k) + '</span><span class="v">' + h(v) + '</span></div>' : ''; }
@@ -588,37 +833,176 @@ var Core = (function(){
     L.innerHTML = '<div class="wrap">' +
       '<div class="topline"><a class="textbtn" href="#" id="back">‹ Index</a><span class="label">' + (pos >= 0 ? 'No. ' + pad(pos + 1) : h(s.id)) + '</span></div>' +
       '<div style="display:flex;gap:14px;align-items:flex-start;padding:20px 0 8px">' +
-        '<div style="flex:1;min-width:0"><h1 class="detailname"><span class="' + (s.fav ? 'hl' : '') + '">' + h(s.name) + '</span></h1></div>' +
-        '<div class="logo" aria-hidden="true">' + (domain ? '<img alt="" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=128" onload="if(this.naturalWidth<=16){this.parentNode.textContent=\'' + h(initials) + '\'}" onerror="this.parentNode.textContent=\'' + h(initials) + '\'">' : h(initials)) + '</div>' +
+        '<div style="flex:1;min-width:0"><h1 class="detailname"><span class="' + (s.fav ? 'hl' : '') + '">' + h(s.name) + '</span></h1></div>' + tile +
       '</div>' +
       '<div class="standfirst" style="padding-bottom:14px">' + h(place) + '</div>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;padding-bottom:14px">' +
-        (s.fav ? '<span class="badge">★ Favourite</span>' : '') +
-        (s.status ? '<span class="badge" style="border-color:var(--ink);color:var(--ink)">' + h(s.status.toUpperCase()) + '</span>' : '') +
-        (s.avail === 'Unavailable' ? '<span class="badge" style="border-color:var(--ink);color:var(--ink)">UNAVAILABLE</span>' : '') +
-      '</div>' +
+      (s.avail === 'Unavailable' ? '<div style="padding-bottom:14px"><span class="badge" style="border-color:var(--ink);color:var(--ink)">UNAVAILABLE</span></div>' : '') +
       '<div class="stats">' +
         '<div><span class="label">Tier</span><span class="big">' + (s.tier || '—') + '</span><span class="small">' + h(s.tierLabel || 'To fill') + '</span></div>' +
         '<div><span class="label">Ships AU</span><span class="big">' + h(s.ships || '—') + '</span><span class="small">' + (s.ships ? '' : 'To fill') + '</span></div>' +
         '<div><span class="label">Currency</span><span class="big" style="font-size:' + (s.currency && s.currency.length > 4 ? '16px' : '30px') + '">' + h(s.currency || '—') + '</span><span class="small">' + (s.currency ? '' : 'To fill') + '</span></div>' +
       '</div>' +
       kv('Core item', s.priceNote || (g.price ? 'Tier ' + s.tier + ' guide: ' + g.price : '')) +
-      kv('Shipping', s.shipNote) + kv('Stores', stores) + kv('Notes', s.notes) + kv('Added', s.added) +
+      kv('Shipping', s.shipNote) + kv('Stores', stores) + kv('Notes', s.notes) + kv('Added', s.added) + kv('Last visited', s.visited) +
       (s.offers.length ? '<div class="pills" style="padding:16px 0">' + s.offers.map(function(o){ return '<span class="pill lg">' + h(o) + '</span>'; }).join('') + '</div>' : '') +
-      '<div style="display:flex;gap:8px;padding-top:16px">' +
-        (href ? '<a class="primary" style="flex:1" href="' + h(href) + '" target="_blank" rel="noopener">Visit ' + h(domain) + ' ↗</a>' : '<span class="primary" aria-disabled="true" style="flex:1">No link yet</span>') +
-        '<span class="secondary" aria-disabled="true" title="Editing arrives in Phase 2">Edit</span>' +
+      '<div class="duo">' +
+        '<button class="secondary fav' + (s.fav ? ' on' : '') + '" id="favbtn" aria-pressed="' + s.fav + '">' + (s.fav ? '★ Favourite' : '☆ Favourite') + '</button>' +
+        '<label class="selectbtn"><span style="position:absolute;left:-9999px">Status</span><select id="status">' +
+          '<option value="">' + (s.status ? 'Clear status' : 'Set status') + '</option>' +
+          Core.STATUSES.map(function(t){ return '<option' + (s.status === t ? ' selected' : '') + '>' + h(t) + '</option>'; }).join('') +
+        '</select></label>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;padding-top:8px">' +
+        (href ? '<a class="primary" style="flex:1" id="visit" href="' + h(href) + '" target="_blank" rel="noopener">Visit ' + (domain.length <= 14 ? h(domain) : 'site') + ' ↗</a>' : '<span class="primary" aria-disabled="true" style="flex:1">No link yet</span>') +
+        '<a class="secondary" href="#edit/' + encodeURIComponent(s.id) + '">Edit</a>' +
       '</div></div>';
-    document.getElementById('back').onclick = function(e){ e.preventDefault(); history.length > 1 ? history.back() : (location.hash = ''); };
+    $('back').onclick = function(e){ e.preventDefault(); goBack(''); };
+    $('favbtn').onclick = function(){ update(s.id, {fav: !s.fav}, true); };
+    $('status').onchange = function(){ update(s.id, {status: this.value}, true); };
+    var v = $('visit'); if (v) v.addEventListener('click', function(){ update(s.id, {visited: Core.localDate()}, false); });
     L.scrollTop = 0;
   }
 
+  // ---------- Add / edit ----------
+  function renderForm(L, id){
+    var s = id ? shopById(id) : null;
+    if (id && !s){ L.innerHTML = '<div class="wrap"><div class="topline"><a class="textbtn" href="#">‹ Index</a></div><p class="notice">That shop isn’t in the Sheet any more.</p></div>'; return; }
+    var key = id || 'new';
+    if (formFor !== key){
+      formFor = key;
+      var d = s ? {name: s.name, link: s.link, type: s.type, based: s.based, tier: s.tier, offers: s.offers.slice(), cities: s.cities.join(', '), storeDetails: s.storeDetails,
+        fav: s.fav, status: s.status, notes: s.notes, avail: s.avail, priceNote: s.priceNote, ships: s.ships, shipNote: s.shipNote, currency: s.currency}
+        : {name: '', link: '', type: 'Own label', based: '', tier: null, offers: [], cities: '', storeDetails: '', fav: false, status: '', notes: ''};
+      L.draft = d; L.nameTouched = !!s; L.confirmDelete = false;
+      buildForm(L, s);
+    }
+  }
+  function opt(list, val, blank){ return (blank != null ? '<option value="">' + h(blank) + '</option>' : '') + list.map(function(x){ return '<option' + (x === val ? ' selected' : '') + '>' + h(x) + '</option>'; }).join(''); }
+  function buildForm(L, s){
+    var d = L.draft, edit = !!s;
+    var countries = {}; state.shops.forEach(function(x){ if (x.based) countries[x.based] = 1; });
+    var clist = Object.keys(countries).sort();
+    var other = d.based && clist.indexOf(d.based) < 0;
+    function field(id, label, input){ return '<label class="field" for="' + id + '"><span class="label">' + label + '</span>' + input + '</label>'; }
+    L.innerHTML = '<div class="wrap"><form id="shopform" novalidate>' +
+      '<div class="pagetitle"><h1>' + (edit ? 'EDIT ENTRY' : 'NEW ENTRY') + '</h1><a class="textbtn" href="#" id="cancel">Cancel</a></div>' +
+      field('f-link', 'Link', '<input id="f-link" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste the shop’s website" value="' + h(d.link) + '">') +
+      '<div id="dupes" aria-live="polite"></div>' +
+      field('f-name', 'Name *', '<input id="f-name" autocomplete="off" value="' + h(d.name) + '">') +
+      '<div class="grid2">' +
+        field('f-type', 'Shop type', '<select id="f-type">' + opt(Core.TYPES, d.type) + '</select>') +
+        field('f-based', 'Based in', '<select id="f-based">' + opt(clist, other ? '__other' : d.based, '—') + '<option value="__other"' + (other ? ' selected' : '') + '>Other…</option></select>') +
+      '</div>' +
+      '<div id="otherwrap"' + (other ? '' : ' hidden') + '>' + field('f-other', 'Country', '<input id="f-other" autocomplete="off" value="' + h(other ? d.based : '') + '">') + '</div>' +
+      '<div class="field"><span class="label">Price tier</span><div class="tiers" role="group" aria-label="Price tier">' +
+        [1,2,3,4,5,6,7].map(function(t){ return '<button type="button" data-t="' + t + '" aria-pressed="' + (d.tier === t) + '" aria-label="Tier ' + t + ' ' + h((state.guide[t] || {}).label || '') + '">' + t + '</button>'; }).join('') +
+      '</div><div class="caption" id="tiercap"></div></div>' +
+      '<div class="field"><span class="label">Offers</span><div style="display:flex;flex-wrap:wrap;gap:8px">' +
+        Core.OFFERS.map(function(o){ return '<button type="button" class="offerbtn" data-o="' + h(o) + '" aria-pressed="' + (d.offers.indexOf(o) >= 0) + '">' + h(o) + '</button>'; }).join('') +
+      '</div></div>' +
+      field('f-cities', 'Store cities', '<input id="f-cities" autocomplete="off" placeholder="e.g. Melbourne, Sydney" value="' + h(d.cities) + '">') +
+      field('f-store', 'Store details', '<input id="f-store" autocomplete="off" placeholder="Suburb or address" value="' + h(d.storeDetails) + '">') +
+      '<div class="grid2">' +
+        '<label class="check" style="border-bottom:1px solid var(--ink)"><span>★ Favourite</span><input type="checkbox" id="f-fav"' + (d.fav ? ' checked' : '') + '></label>' +
+        field('f-status', 'Status', '<select id="f-status">' + opt(Core.STATUSES, d.status, '—') + '</select>') +
+      '</div>' +
+      (edit ?
+        '<div class="grid2">' +
+          field('f-avail', 'Availability', '<select id="f-avail">' + opt(Core.AVAIL, d.avail) + '</select>') +
+          field('f-ships', 'Ships to AU', '<select id="f-ships">' + opt(Core.SHIPS, d.ships, '—') + '</select>') +
+        '</div>' +
+        field('f-currency', 'Currency', '<select id="f-currency">' + opt(Core.CURRENCIES, d.currency, '—') + '</select>') +
+        field('f-price', 'Price note', '<input id="f-price" autocomplete="off" placeholder="e.g. Knit ~$290" value="' + h(d.priceNote) + '">') +
+        field('f-ship', 'Shipping note', '<input id="f-ship" autocomplete="off" placeholder="Duties, free-shipping threshold" value="' + h(d.shipNote) + '">')
+      : '') +
+      field('f-notes', 'Notes', '<textarea id="f-notes" rows="3">' + h(d.notes) + '</textarea>') +
+      '<div id="formerr" aria-live="assertive"></div>' +
+      '<div style="padding-top:20px"><button type="submit" class="primary" id="save">' + (edit ? 'Save changes' : 'Add to the index') + '</button></div>' +
+      (edit ? '<div id="delwrap" style="padding-top:28px"></div>' : '') +
+    '</form></div>';
+
+    function readInputs(){
+      d.link = $('f-link').value; d.name = $('f-name').value; d.type = $('f-type').value;
+      var b = $('f-based').value; d.based = b === '__other' ? $('f-other').value.trim() : b;
+      d.cities = $('f-cities').value; d.storeDetails = $('f-store').value; d.fav = $('f-fav').checked; d.status = $('f-status').value; d.notes = $('f-notes').value;
+      if (edit){ d.avail = $('f-avail').value; d.ships = $('f-ships').value; d.currency = $('f-currency').value; d.priceNote = $('f-price').value; d.shipNote = $('f-ship').value; }
+    }
+    function dupes(){
+      readInputs();
+      var list = Core.findDuplicates(state.shops, d.name, d.link, s ? s.id : null);
+      $('dupes').innerHTML = list.length ? list.slice(0, 3).map(function(x){
+        return '<div class="dupe"><div style="display:flex;flex-direction:column;gap:4px;min-width:0"><span class="label" style="color:var(--lilac-ink)">Already in the index · ' + h(x.why) + '</span>' +
+          '<span class="val" style="text-transform:uppercase">' + h(x.shop.name) + '</span><span style="font-size:12px">' + h([x.shop.type, x.shop.based, x.shop.tier ? 'Tier ' + x.shop.tier : ''].filter(Boolean).join(' · ')) + '</span></div>' +
+          '<a class="primary" style="width:auto;height:44px;padding:0 14px;font-size:12px" href="#shop/' + encodeURIComponent(x.shop.id) + '">Open</a></div>';
+      }).join('') : '';
+      $('save').textContent = list.length && !edit ? 'Save anyway' : (edit ? 'Save changes' : 'Add to the index');
+    }
+    function tierCap(){ var g = state.guide[d.tier] || {}; $('tiercap').textContent = d.tier ? (g.label || '') + (g.price ? ' · ' + g.price + ' core item' : '') : 'Tap a tier. Tap it again to clear.'; }
+    $('f-link').addEventListener('input', function(){
+      if (!L.nameTouched){ $('f-name').value = Core.guessName($('f-link').value); }
+      dupes();
+    });
+    $('f-name').addEventListener('input', function(){ L.nameTouched = true; dupes(); });
+    $('f-based').onchange = function(){ $('otherwrap').hidden = this.value !== '__other'; if (this.value === '__other') $('f-other').focus(); };
+    each(L, '[data-t]', function(b){ b.onclick = function(){ var t = +b.getAttribute('data-t'); d.tier = d.tier === t ? null : t; each(L, '[data-t]', function(x){ x.setAttribute('aria-pressed', String(+x.getAttribute('data-t') === d.tier)); }); tierCap(); }; });
+    each(L, '[data-o]', function(b){ b.onclick = function(){ var o = b.getAttribute('data-o'), i = d.offers.indexOf(o); i >= 0 ? d.offers.splice(i, 1) : d.offers.push(o); b.setAttribute('aria-pressed', String(i < 0)); }; });
+    $('cancel').onclick = function(e){ e.preventDefault(); formFor = null; goBack(s ? '#shop/' + s.id : ''); };
+    $('shopform').onsubmit = function(e){
+      e.preventDefault(); readInputs();
+      if (!d.name.trim()){ $('formerr').innerHTML = '<div class="err" style="margin-top:16px">Add a name before saving.</div>'; $('f-name').focus(); return; }
+      var fields = {name: d.name.trim(), link: d.link, type: d.type, based: d.based, tier: d.tier, offers: d.offers, cities: d.cities, storeDetails: d.storeDetails, fav: d.fav, status: d.status, notes: d.notes};
+      if (edit){
+        Object.assign(fields, {avail: d.avail, ships: d.ships, currency: d.currency, priceNote: d.priceNote, shipNote: d.shipNote});
+        formFor = null; location.replace('#shop/' + encodeURIComponent(s.id));
+        var changed = update(s.id, fields, true);
+        if (!changed) toast('No changes to save');
+      } else {
+        var id = Core.nextId(state.data.shops);
+        var cells = Core.toCells(fields); cells['Date added'] = Core.localDate(); cells['Availability'] = 'Available';
+        formFor = null; location.replace('#shop/' + encodeURIComponent(id));
+        enqueue({op: 'add', id: id, cells: cells}, true);
+      }
+    };
+    if (edit){
+      var del = $('delwrap');
+      function drawDel(){
+        del.innerHTML = L.confirmDelete
+          ? '<div class="dupe" style="flex-direction:column;align-items:stretch"><span class="val">Delete ' + h(s.name.toUpperCase()) + '?</span><span style="font-size:13px;line-height:1.4">This removes its row from your Sheet. Marking it Unavailable instead keeps it but hides it.</span>' +
+            '<div class="grid2" style="padding:0"><button type="button" class="secondary" id="delno">Keep it</button><button type="button" class="primary" id="delyes">Delete</button></div></div>'
+          : '<button type="button" class="textbtn" id="delask" style="text-decoration:underline">Delete this shop</button>';
+        if (L.confirmDelete){
+          $('delno').onclick = function(){ L.confirmDelete = false; drawDel(); };
+          $('delyes').onclick = function(){ formFor = null; location.replace('#'); enqueue({op: 'delete', id: s.id}, true); toast('Deleted ' + s.name); };
+        } else $('delask').onclick = function(){ L.confirmDelete = true; drawDel(); };
+      }
+      drawDel();
+    }
+    tierCap(); dupes();
+    L.scrollTop = 0;
+    if (!edit) setTimeout(function(){ $('f-link') && $('f-link').focus(); }, 50);
+  }
+
+  // ---------- Conflict ----------
+  function renderConflict(L){
+    var c = state.conflict;
+    if (!c){ location.replace('#'); return; }
+    var s = shopById(c.op.id) || {name: c.op.id};
+    L.innerHTML = '<div class="wrap"><div class="pagetitle"><h1>CHECK THIS</h1></div>' +
+      '<p class="standfirst" style="padding:16px 0 8px">' + h(s.name) + ' was also changed in the Sheet since the app last loaded it. Which version should stay?</p>' +
+      c.conflicts.map(function(x){ return '<div class="sect"><span class="label">' + h(x.field) + '</span>' +
+        '<div class="kv" style="border-bottom:1px solid var(--hairline)"><span class="label muted">In the Sheet</span><span class="v">' + h(x.sheet || '(empty)') + '</span></div>' +
+        '<div class="kv" style="border:none"><span class="label muted">Yours</span><span class="v">' + h(x.mine || '(empty)') + '</span></div></div>'; }).join('') +
+      '<div class="grid2" style="padding-top:20px"><button class="secondary" id="keepsheet">Keep the Sheet’s</button><button class="primary" id="keepmine">Keep mine</button></div></div>';
+    $('keepmine').onclick = function(){ c.op.force = true; lsSet(K.queue, state.queue); state.conflict = null; location.replace('#shop/' + c.op.id); flush(true); };
+    $('keepsheet').onclick = function(){ state.queue.shift(); lsSet(K.queue, state.queue); state.conflict = null; location.replace('#shop/' + c.op.id); state.queue.length ? flush(true) : sync(false); };
+  }
+
+  // ---------- Filters ----------
   function counts(field){
     var c = {};
     state.shops.forEach(function(s){ if (Core.isHiddenByDefault(s) && !state.settings.filters.showHidden) return; var v = s[field]; (Array.isArray(v) ? v : [v]).forEach(function(x){ if (x) c[x] = (c[x] || 0) + 1; }); });
     return c;
   }
-
   function renderFilters(L){
     var f = state.settings.filters, res = Core.run(state.shops, state.settings);
     var lo = f.tierMin, hi = f.tierMax, g = state.guide;
@@ -646,29 +1030,27 @@ var Core = (function(){
       '<div style="padding-top:20px"><a class="primary" href="#" id="done">Show ' + res.list.length + ' shops</a></div>' +
     '</div>';
     function upd(){ save(); renderResults(); var st = L.scrollTop; renderFilters(L); L.scrollTop = st; }
-    Array.prototype.forEach.call(L.querySelectorAll('[data-t]'), function(b){ b.onclick = function(){
+    each(L, '[data-t]', function(b){ b.onclick = function(){
       var t = +b.getAttribute('data-t');
       if (f.tierMin == null) { f.tierMin = f.tierMax = t; }
       else if (f.tierMin === f.tierMax) { if (t === f.tierMin) f.tierMin = f.tierMax = null; else { f.tierMin = Math.min(t, f.tierMin); f.tierMax = Math.max(t, f.tierMax); } }
       else { f.tierMin = f.tierMax = t; }
       upd();
     }; });
-    Array.prototype.forEach.call(L.querySelectorAll('[data-o]'), function(b){ b.onclick = function(){ var o = b.getAttribute('data-o'); var i = f.offers.indexOf(o); i >= 0 ? f.offers.splice(i, 1) : f.offers.push(o); upd(); }; });
-    Array.prototype.forEach.call(L.querySelectorAll('[data-ty]'), function(b){ b.onchange = function(){ var o = b.getAttribute('data-ty'); var i = f.types.indexOf(o); i >= 0 ? f.types.splice(i, 1) : f.types.push(o); upd(); }; });
-    Array.prototype.forEach.call(L.querySelectorAll('[data-st]'), function(b){ b.onchange = function(){ var o = b.getAttribute('data-st'); var i = f.statuses.indexOf(o); i >= 0 ? f.statuses.splice(i, 1) : f.statuses.push(o); upd(); }; });
-    document.getElementById('fav').onchange = function(){ f.favOnly = this.checked; upd(); };
-    document.getElementById('hid').onchange = function(){ f.showHidden = this.checked; upd(); };
-    document.getElementById('clear').onclick = function(){ state.settings.filters = Core.defaultFilters(); save(); renderResults(); renderFilters(L); };
-    document.getElementById('done').onclick = function(e){ e.preventDefault(); location.hash = ''; };
+    each(L, '[data-o]', function(b){ b.onclick = function(){ var o = b.getAttribute('data-o'); var i = f.offers.indexOf(o); i >= 0 ? f.offers.splice(i, 1) : f.offers.push(o); upd(); }; });
+    each(L, '[data-ty]', function(b){ b.onchange = function(){ var o = b.getAttribute('data-ty'); var i = f.types.indexOf(o); i >= 0 ? f.types.splice(i, 1) : f.types.push(o); upd(); }; });
+    each(L, '[data-st]', function(b){ b.onchange = function(){ var o = b.getAttribute('data-st'); var i = f.statuses.indexOf(o); i >= 0 ? f.statuses.splice(i, 1) : f.statuses.push(o); upd(); }; });
+    $('fav').onchange = function(){ f.favOnly = this.checked; upd(); };
+    $('hid').onchange = function(){ f.showHidden = this.checked; upd(); };
+    $('clear').onclick = function(){ state.settings.filters = Core.defaultFilters(); save(); renderResults(); renderFilters(L); };
+    $('done').onclick = function(e){ e.preventDefault(); location.hash = ''; };
   }
-
   function priceRange(lo, hi){
     var g = state.guide, a = (g[lo] || {}).price || '', b = (g[hi] || {}).price || '';
     if (lo === hi) return a;
     var from = a.replace(/^Under\s*/i, '$0 - ').split(/\s*-\s*/)[0], to = b.split(/\s*-\s*/).pop();
     return (from || '') + '–' + (to || '');
   }
-
   function renderPicker(L, kind){
     var f = state.settings.filters, html = '';
     if (kind === 'places'){
@@ -678,25 +1060,25 @@ var Core = (function(){
         '<div class="sect"><div class="head"><span class="label">Countries</span></div>' +
         Object.keys(byC).sort().map(function(c){ var v = 'country:' + c; return '<label class="check"><span>' + h(c) + '<span class="n">' + byC[c] + '</span></span><input type="checkbox" data-p="' + h(v) + '"' + (f.places.indexOf(v) >= 0 ? ' checked' : '') + '></label>'; }).join('') + '</div>';
     } else {
-      var cc = counts('cities');
-      var cities = Object.keys(cc).sort();
+      var cc = counts('cities'), cities = Object.keys(cc).sort();
       html = '<div class="sect"><p class="standfirst" style="margin:0 0 8px">Only shops with a store in one city. Your other filters still apply.</p>' +
         '<label class="check"><span>Off</span><input type="radio" name="trip" data-c=""' + (!f.trip ? ' checked' : '') + '></label>' +
         cities.map(function(c){ return '<label class="check"><span>' + h(c) + '<span class="n">' + cc[c] + '</span></span><input type="radio" name="trip" data-c="' + h(c) + '"' + (f.trip === c ? ' checked' : '') + '></label>'; }).join('') +
         (cities.length ? '' : '<p class="muted">No shops have a Store city yet.</p>') + '</div>';
     }
     L.innerHTML = '<div class="wrap"><div class="pagetitle"><h1>' + (kind === 'places' ? 'BASED IN' : 'TRIP MODE') + '</h1><a class="textbtn" href="#filters">Done</a></div>' + html + '</div>';
-    Array.prototype.forEach.call(L.querySelectorAll('[data-p]'), function(b){ b.onchange = function(){ var v = b.getAttribute('data-p'); var i = f.places.indexOf(v); i >= 0 ? f.places.splice(i, 1) : f.places.push(v); save(); renderResults(); }; });
-    Array.prototype.forEach.call(L.querySelectorAll('[data-c]'), function(b){ b.onchange = function(){ f.trip = b.getAttribute('data-c') || null; save(); renderResults(); location.hash = 'filters'; }; });
+    each(L, '[data-p]', function(b){ b.onchange = function(){ var v = b.getAttribute('data-p'); var i = f.places.indexOf(v); i >= 0 ? f.places.splice(i, 1) : f.places.push(v); save(); renderResults(); }; });
+    each(L, '[data-c]', function(b){ b.onchange = function(){ f.trip = b.getAttribute('data-c') || null; save(); renderResults(); location.hash = 'filters'; }; });
   }
 
   // ---------- Start ----------
   window.addEventListener('hashchange', renderLayer);
-  window.addEventListener('online', function(){ state.offline = false; sync(false); });
+  window.addEventListener('online', function(){ state.offline = false; state.queue.length ? flush(false) : sync(false); });
   window.addEventListener('offline', function(){ state.offline = true; renderBottom(); });
   loadCache();
   render();
   if (token()) sync(false);
+  window.__rolladex = {state: state, flush: flush, sync: sync};
 })();
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer onload="window.rolladexAuthReady && window.rolladexAuthReady()"></script>
